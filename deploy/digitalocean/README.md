@@ -11,6 +11,7 @@ sub-issues; the platform choice is D-67.
 | `sweeps.sh` | Fires due routines and culls unsent attachments; host cron runs it |
 | `Caddyfile` | HTTPS for `OPENBOT_DOMAIN`, certificates from Let's Encrypt |
 | `.env.example` | Every setting this deployment needs, with where each value comes from |
+| `opentag` service | Slack through CopilotKit OpenTag, started with `--profile slack` |
 
 ## Before you start
 
@@ -64,6 +65,38 @@ empty `CLAUDE_CODE_OAUTH_TOKEN`, set `BOT_PROVIDER=anthropic` and `ANTHROPIC_API
 spending cap in the Anthropic Console), and `docker compose --env-file .env up -d`. Never set both;
 the harness refuses to start if you do.
 
+## Slack (AP-88)
+
+OpenTag sits between Slack and OpenBot. Slack's credentials live in CopilotKit Intelligence, and
+OpenTag reaches it over an outbound connection, so the droplet publishes nothing new.
+
+1. On a laptop, with the same Intelligence project as `INTELLIGENCE_API_KEY`:
+
+   ```sh
+   npx --yes copilotkit@latest project select
+   npx --yes copilotkit@latest channels add --name digital-factory --display-name "Factory" --adapter slack --json
+   ```
+
+   It pauses with a `nextAction`: a prefilled Slack app link and a `resumeCommand`. Create the app
+   in the AP Venture Slack workspace, leave **Socket Mode off**, choose **Reinstall to Workspace**
+   under OAuth & Permissions, then run the `resumeCommand`.
+2. In `.env`, set `OPENTAG_SHARED_SECRET` (at least 32 characters) and keep `OPENTAG_URL` and
+   `INTELLIGENCE_CHANNEL_NAME=digital-factory` as they are.
+3. `docker compose --env-file .env --profile slack up -d --build`. The first build takes a few
+   minutes: OpenTag is built from its `openbot-pairing` branch because no release has it yet.
+4. In Slack, `/invite @Factory` to the channels it should work in.
+5. Each person opens the Orchestrator's page in OpenBot, **Reaching you**, **Connect**, and sends the
+   `link <code>` it shows to @Factory in a direct message within ten minutes.
+
+Check it from a real account: a mention gets a reply, a follow-up in that thread gets a reply, an
+unmentioned message in a new conversation gets silence.
+
+**Not working yet, upstream:** OpenTag's pairing branch does not implement OpenBot's proactive
+sends or channel-membership checks. Live replies work. Replies that come after an approval, a
+Bot's questions, routine results and Slack triggers do not reach Slack; they show in the OpenBot
+web and mobile apps instead, and fail visibly in OpenBot's delivery outbox. Move `OPENTAG_REF` to a
+newer commit once upstream adds them.
+
 ## Update
 
 ```sh
@@ -95,5 +128,7 @@ git checkout -b chore/sync-upstream-<date> && git merge upstream/main
   container. docs/deployment.md calls this fine for one team that trusts its own Bots. A computer per
   Bot needs the supervisor (or the Helm chart on a cluster), and is the next step once more than a
   few Bots or any untrusted Bot run here.
-- **Slack is not wired yet.** That is AP-88: deploy OpenTag and pair it (docs/configuration.md,
-  "Slack and Microsoft Teams").
+- **Slack is partial.** Live replies only, until OpenTag implements OpenBot's proactive sends (see
+  "Slack"). Everything else is in the OpenBot web and mobile apps.
+- **One Slack identity.** Every coworker answers through @Factory, under its own name. A Slack
+  app and @handle per coworker is AP-92.
