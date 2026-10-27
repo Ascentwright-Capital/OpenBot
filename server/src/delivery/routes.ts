@@ -433,11 +433,27 @@ export function configuredDeliveryProviders(
     throw new Error("OPENTAG_URL must be an http(s) URL.");
   if (opentagIcon && !opentagIcon.startsWith("https://"))
     throw new Error("OPENTAG_BOT_ICON_URL_TEMPLATE must be an https URL.");
+  const answerInChannels = env.OPENTAG_ANSWER_IN_CHANNELS?.trim().toLowerCase();
+  if (
+    answerInChannels &&
+    !["true", "false", "1", "0"].includes(answerInChannels)
+  )
+    throw new Error("OPENTAG_ANSWER_IN_CHANNELS must be true or false.");
+  if (
+    (answerInChannels === "true" || answerInChannels === "1") &&
+    !opentagSecret
+  )
+    throw new Error(
+      "Delivery configuration is incomplete: OPENTAG_SHARED_SECRET.",
+    );
   const opentag = opentagSecret
     ? createOpenTagTransport({
         secret: opentagSecret,
         ...(opentagUrl ? { url: opentagUrl } : {}),
         ...(opentagIcon ? { iconUrlTemplate: opentagIcon } : {}),
+        ...(answerInChannels === "true" || answerInChannels === "1"
+          ? { answerInChannels: true }
+          : {}),
       })
     : undefined;
   const smsValues = configured([
