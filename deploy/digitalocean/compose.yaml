@@ -51,22 +51,22 @@ services:
       retries: 5
 
   # OpenTag calls OpenBot as its agent; Slack credentials live in CopilotKit Intelligence, which
-  # OpenTag reaches over an outbound WebSocket, so nothing here is published. Built from OpenTag's
-  # openbot-pairing branch, pinned to a commit, because no release carries the pairing yet.
-  # Not in that branch yet: OpenBot's proactive sends (/openbot/deliver) and channel-membership
-  # checks (/openbot/membership). Live replies work; replies after an approval, questions and
-  # routine results do not reach Slack, and appear in the OpenBot app instead.
+  # OpenTag reaches over an outbound WebSocket, so nothing here is published. Built from our copy
+  # of OpenTag's openbot-pairing branch (Ascentwright-Capital/OpenTag), pinned to a commit. Ours
+  # adds OpenBot's proactive sends (/openbot/deliver) and channel-membership checks
+  # (/openbot/membership), posted with the Slack app's bot token, and marks Slack DMs as private.
   opentag:
     profiles: ["slack"]
     build:
-      context: https://github.com/CopilotKit/OpenTag.git#${OPENTAG_REF:-decca4482007318392d4f535bf6ef3c69a71cf1e}
+      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-5e7c85d19ca0ba2ba47acf6464bbb8f0b242759e}
       dockerfile: deployment/docker/runtime.Dockerfile
-    image: digital-factory/opentag-runtime:${OPENTAG_REF:-decca4482007318392d4f535bf6ef3c69a71cf1e}
+    image: digital-factory/opentag-runtime:${OPENTAG_REF:-5e7c85d19ca0ba2ba47acf6464bbb8f0b242759e}
     restart: unless-stopped
     environment:
       AGENT_URL: http://openbot:3001/api/delivery/webhooks/opentag/agent
       AGENT_AUTH_HEADER: Bearer ${OPENTAG_SHARED_SECRET:-}
       OPENBOT_PAIRING: "true"
+      OPENBOT_SLACK_BOT_TOKEN: ${OPENTAG_SLACK_BOT_TOKEN:-}
       AGENT_DISPLAY_NAME: ${OPENTAG_DISPLAY_NAME:-Factory}
       INTELLIGENCE_API_KEY: ${INTELLIGENCE_API_KEY}
       INTELLIGENCE_CHANNEL_NAME: ${INTELLIGENCE_CHANNEL_NAME:-digital-factory}
