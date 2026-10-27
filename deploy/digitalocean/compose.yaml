@@ -22,7 +22,10 @@ services:
       EMBEDDED_POSTGRES: "on"
       PICKED_HARNESS_IMAGE: ghcr.io/copilotkit/openbot-agent-claude-sdk:${OPENBOT_VERSION}
       PICKED_HARNESS_URL: http://agent-claude-sdk:4212
+      # Our coworkers instead of the fintech example (tenant/README.md).
+      TENANT_PACKAGE_DIR: /tenant
     volumes:
+      - ./tenant:/tenant:ro
       # The parent of the data directory, not the data directory itself (docs/deployment.md).
       - openbot-postgres:/var/lib/postgresql
       - openbot-workspace:/workspace

@@ -1,0 +1,3 @@
+# Document sources this deployment may connect to. None yet: connectors are granted per coworker on
+# its profile once they are added.
+sources: []
