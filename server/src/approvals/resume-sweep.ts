@@ -15,6 +15,7 @@ import {
 import type { DeliveryScope } from "../delivery/types";
 import type { ResponsibilityStore } from "../responsibilities/types";
 import { DEFAULT_MAX_ATTEMPTS, type WorkQueue } from "../work/queue";
+import { approvalOutcomeNotice, queryEnded } from "./query-ended";
 import type { ApprovalResumeDependencies, ApprovalService } from "./service";
 
 /**
@@ -112,9 +113,8 @@ export function createApprovalResumeTick(deps: {
               approvalId,
             );
             // A group turn's approval also writes the resumed reply into the shared transcript.
-            const outcome = await groupConversations.continueWaiting(
-              approvalId,
-              () =>
+            const outcome = await groupConversations
+              .continueWaiting(approvalId, () =>
                 approvalContinuationRunner({
                   ownerUserId: input.ownerUserId,
                   routineId: "approval",
@@ -124,7 +124,22 @@ export function createApprovalResumeTick(deps: {
                   initiator: snapshot.initiator ?? PERSON_INITIATOR,
                   continuation: { snapshot, result, messageId },
                 }),
-            );
+              )
+              .catch((error: unknown) => {
+                /*
+                 * The Claude query that asked ended before the answer came (its time limit, or a
+                 * restart), so nothing can take the result. The action has run or been refused
+                 * either way; retrying only failed again until the work item died, and the request
+                 * never finished. The person is told the outcome instead.
+                 */
+                if (!queryEnded(error)) throw error;
+                return {
+                  replyText: approvalOutcomeNotice(
+                    request.action.toolRef,
+                    result,
+                  ),
+                };
+              });
             const [source] = await database
               .select({ channelId: intelligenceChannelMappings.channelId })
               .from(intelligenceChannelMappings)
