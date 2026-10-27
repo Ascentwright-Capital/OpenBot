@@ -34,12 +34,16 @@ grep -qxF "$KEY" "/home/$USER_NAME/.ssh/authorized_keys" 2>/dev/null || echo "$K
 chown "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.ssh/authorized_keys"
 chmod 600 "/home/$USER_NAME/.ssh/authorized_keys"
 echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USER_NAME"
-cat > /etc/ssh/sshd_config.d/90-factory.conf <<'CONF'
+# sshd keeps the first value it reads, so this file sorts before cloud-init's 50-cloud-init.conf.
+rm -f /etc/ssh/sshd_config.d/90-factory.conf
+cat > /etc/ssh/sshd_config.d/01-factory.conf <<'CONF'
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 CONF
-systemctl reload ssh
+sshd -t
+# Ubuntu 24.04 starts sshd from ssh.socket, so ssh.service may be inactive; it reads the file on start.
+systemctl try-reload-or-restart ssh
 
 # Only SSH and the web. Docker publishes ports past ufw, so compose.yaml publishes only Caddy.
 ufw default deny incoming
