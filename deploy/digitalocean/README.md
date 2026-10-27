@@ -133,6 +133,11 @@ cd deploy/digitalocean && docker compose --env-file .env pull && docker compose 
 
 Read the release's `CHANGELOG.md` entry first. Upstream is alpha and says so.
 
+The `openbot` image is built here, not pulled: from our `factory/<version>` branch, which is the
+release plus our own server changes (today `OPENTAG_ANSWER_IN_CHANNELS`). To move to a new release,
+branch `factory/<new version>` from its tag, cherry-pick our changes onto it, point the `openbot`
+build in `compose.yaml` at the new commit, and run `docker compose --env-file .env up -d --build`.
+
 ## Sync the fork with upstream
 
 ```sh
