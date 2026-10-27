@@ -1,0 +1,5 @@
+# The id stays `openbot`: it names this deployment inside the CopilotKit Intelligence project, and
+# changing it after the first start would strand the threads already written under it.
+tenant:
+  id: openbot
+  product_name: AP Venture Factory

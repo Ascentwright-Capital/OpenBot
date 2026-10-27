@@ -87,6 +87,8 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
 4. In Slack, `/invite @Factory` to the channels it should work in.
 5. Each person opens the Orchestrator's page in OpenBot, **Reaching you**, **Connect**, and sends the
    `link <code>` it shows to @Factory in a direct message within ten minutes.
+   If the dialog says "Failed to fetch", a browser ad or privacy blocker stopped the request
+   (`net::ERR_BLOCKED_BY_CLIENT`): allow the site or use a private window.
 
 Check it from a real account: a mention gets a reply, a follow-up in that thread gets a reply, an
 unmentioned message in a new conversation gets silence.
@@ -96,6 +98,22 @@ sends or channel-membership checks. Live replies work. Replies that come after a
 Bot's questions, routine results and Slack triggers do not reach Slack; they show in the OpenBot
 web and mobile apps instead, and fail visibly in OpenBot's delivery outbox. Move `OPENTAG_REF` to a
 newer commit once upstream adds them.
+
+## Coworkers (AP-89)
+
+The coworkers live in [`tenant/`](tenant/README.md): Orchestrator (the front desk people reach in
+Slack), Marketing, Analytics and Software factory, each a built-in Bot running on the Claude plan.
+`compose.yaml` mounts the directory and points `TENANT_PACKAGE_DIR` at it, so changing a role is a
+pull request, then `git pull` and `docker compose --env-file .env up -d` on the droplet.
+
+A role grants nothing. After the first start, an administrator grants on each coworker's profile:
+
+1. **Orchestrator:** the other three coworkers, so it can hand work to them.
+2. **Every coworker:** Linear, once the Linear connector is added.
+3. **Marketing:** the browser, for research.
+
+Link Slack to the Orchestrator's **Front desk** conversation (see "Slack", step 5) so the team talks
+to the front desk rather than to one person's private conversation.
 
 ## Update
 

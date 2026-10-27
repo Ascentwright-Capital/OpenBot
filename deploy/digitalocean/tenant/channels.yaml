@@ -1,0 +1,22 @@
+# One starting conversation per coworker. Everybody signed in may open each one.
+channels:
+  - id: front-desk
+    name: Front desk
+    description: Ask the factory for anything. The Orchestrator hands it to the right coworker.
+    permitted_agents: [orchestrator]
+    allowed_groups: [all]
+  - id: marketing
+    name: Marketing
+    description: Social posts, campaigns and copy for Nusa Auto.
+    permitted_agents: [marketing]
+    allowed_groups: [all]
+  - id: analytics
+    name: Analytics
+    description: Questions answered with data, read-only.
+    permitted_agents: [analytics]
+    allowed_groups: [all]
+  - id: software-factory
+    name: Software factory
+    description: Code changes as pull requests, from a Linear issue.
+    permitted_agents: [software-factory]
+    allowed_groups: [all]
