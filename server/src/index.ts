@@ -71,6 +71,7 @@ import {
   type ApprovalResumeDependencies,
   createApprovalService,
 } from "./approvals/service";
+import { approvalOutcomeNotice, queryEnded } from "./approvals/query-ended";
 import { createApprovalStore } from "./approvals/store";
 import {
   ApprovalRefusedError,
@@ -2074,9 +2075,8 @@ const approvalSweep = repeatAfterEach(async () => {
             approvalId,
           );
           // A group turn's approval also writes the resumed reply into the shared transcript.
-          const outcome = await groupConversations.continueWaiting(
-            approvalId,
-            () =>
+          const outcome = await groupConversations
+            .continueWaiting(approvalId, () =>
               approvalContinuationRunner({
                 ownerUserId: input.ownerUserId,
                 routineId: "approval",
@@ -2086,7 +2086,22 @@ const approvalSweep = repeatAfterEach(async () => {
                 initiator: snapshot.initiator ?? PERSON_INITIATOR,
                 continuation: { snapshot, result, messageId },
               }),
-          );
+            )
+            .catch((error: unknown) => {
+              /*
+               * The Claude query that asked ended before the answer came (its time limit, or a
+               * restart), so nothing can take the result. The action has run or been refused
+               * either way; retrying only failed again until the work item died, and the request
+               * never finished. The person is told the outcome instead.
+               */
+              if (!queryEnded(error)) throw error;
+              return {
+                replyText: approvalOutcomeNotice(
+                  request.action.toolRef,
+                  result,
+                ),
+              };
+            });
           const [source] = await database
             .select({ channelId: intelligenceChannelMappings.channelId })
             .from(intelligenceChannelMappings)

@@ -7,6 +7,7 @@ import {
   clearDesktopConnectionFailure,
   recordDesktopConnectionFailure,
 } from "../desktop-connection-failure";
+import { QUERY_ENDED_ERROR } from "../approvals/query-ended";
 
 // Use the model contract of the runtime we actually ship, without a second AI SDK version.
 export type PlanLanguageModel = Extract<
@@ -421,6 +422,8 @@ export class PlanModel implements PlanLanguageModel {
                   }
                   case "RUN_ERROR": {
                     const error = new Error(event.message);
+                    if (event.code === "OPENBOT_QUERY_ENDED")
+                      error.name = QUERY_ENDED_ERROR;
                     if (event.code === "OPENBOT_MODEL_AUTH_REQUIRED") {
                       error.name = "OpenBotModelAuthenticationError";
                       recordDesktopConnectionFailure({
