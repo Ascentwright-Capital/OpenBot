@@ -310,13 +310,21 @@ async function answer(
     return { text: "I already passed that message to your Bot." };
   if (result.kind === "failed") return { text: `${result.message}` };
 
-  if (!sender.private) return answerPrivately(deps, result);
+  if (!sender.private && !deps.opentag.config.answerInChannels)
+    return answerPrivately(deps, result);
 
   const questions = result.extras.questions.map((q) => q.text);
   const approvalId = result.extras.approvals[0];
   const parts = [result.replyText, ...questions].filter(Boolean);
   if (questions.length) parts.push("Reply here to answer.");
-  if (approvalId) {
+  if (approvalId && !sender.private) {
+    // An approval card shows what the Bot wants to do; in a shared thread that goes to the owner
+    // directly, like the rest of a private answer, and the thread only says it is waiting.
+    await notifyApprovals(deps, result);
+    parts.push(
+      "I need your approval before I continue, so I sent the request to you directly.",
+    );
+  } else if (approvalId) {
     const card = await approvalCard(deps, result.binding, approvalId);
     if (result.extras.approvals.length > 1)
       parts.push(
@@ -367,6 +375,27 @@ async function answerPrivately(
       kind: "question",
       requestId: question.id,
     });
+  await notifyApprovals(deps, result);
+  return {
+    text: "Other people may be able to read this conversation, so I sent my answer to you directly.",
+  };
+}
+
+/** Each approval the turn is waiting on, to the owner through the delivery outbox. */
+async function notifyApprovals(
+  deps: OpenTagAgentDeps,
+  result: Extract<
+    Awaited<ReturnType<DeliveryRouter["converse"]>>,
+    { extras: unknown }
+  >,
+) {
+  if (!result.extras.approvals.length) return;
+  const scope = {
+    ownerUserId: result.binding.ownerUserId,
+    channelId: result.binding.channelId,
+    agentId: result.binding.agentId,
+    threadId: result.binding.threadId,
+  };
   const bot = await deps.store.botIdentity(result.binding.agentId);
   for (const approvalId of result.extras.approvals)
     await deps.router.notify(scope, {
@@ -375,9 +404,6 @@ async function answerPrivately(
       kind: "approval",
       requestId: approvalId,
     });
-  return {
-    text: "Other people may be able to read this conversation, so I sent my answer to you directly.",
-  };
 }
 
 /**
