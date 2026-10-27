@@ -247,6 +247,93 @@ test("a granted tool's name without its prefix is left to the SDK to refuse, and
   }
 });
 
+test("a granted tool goes to the harness without its inner mcp__ prefix and comes back by its granted name", async () => {
+  const requests: Record<string, unknown>[] = [];
+  const server = Bun.serve({
+    port: 0,
+    fetch: async (request) => {
+      const body = await request.json();
+      requests.push(body);
+      return new Response(
+        [
+          { type: "RUN_STARTED", threadId: body.threadId, runId: body.runId },
+          {
+            type: "TOOL_CALL_START",
+            toolCallId: "call",
+            toolCallName: "composio-linear__LINEAR_CREATE_LINEAR_COMMENT",
+          },
+          { type: "TOOL_CALL_ARGS", toolCallId: "call", delta: "{}" },
+          { type: "TOOL_CALL_END", toolCallId: "call" },
+          { type: "RUN_FINISHED", threadId: body.threadId, runId: body.runId },
+        ]
+          .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+          .join(""),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    },
+  });
+  try {
+    const model = new PlanModel(
+      { provider: "claude", endpoint: server.url, token: "owned" },
+      "knowledge",
+      { threadId: "channel" },
+    );
+    const granted = "mcp__composio-linear__LINEAR_CREATE_LINEAR_COMMENT";
+    const result = await model.doGenerate({
+      prompt: [
+        { role: "user", content: [{ type: "text", text: "Read it" }] },
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool-call",
+              toolCallId: "earlier",
+              toolName: granted,
+              input: {},
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: "earlier",
+              toolName: granted,
+              output: { type: "text", value: "ok" },
+            },
+          ],
+        },
+        { role: "user", content: [{ type: "text", text: "Comment" }] },
+      ],
+      tools: [
+        {
+          type: "function",
+          name: granted,
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    });
+    const sent = requests[0] as {
+      tools: { name: string }[];
+      messages: { toolCalls?: { function: { name: string } }[] }[];
+    };
+    expect(sent.tools.map((tool) => tool.name)).toEqual([
+      "composio-linear__LINEAR_CREATE_LINEAR_COMMENT",
+    ]);
+    expect(
+      sent.messages.flatMap((message) =>
+        (message.toolCalls ?? []).map((call) => call.function.name),
+      ),
+    ).toEqual(["composio-linear__LINEAR_CREATE_LINEAR_COMMENT"]);
+    expect(result.content).toContainEqual(
+      expect.objectContaining({ type: "tool-call", toolName: granted }),
+    );
+  } finally {
+    server.stop(true);
+  }
+});
+
 test("the original built-in executes its granted tool and sends the actual matching result", async () => {
   const requests: Record<string, unknown>[] = [];
   const executions: string[] = [];

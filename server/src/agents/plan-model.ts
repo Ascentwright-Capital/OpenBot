@@ -10,6 +10,18 @@ import {
 } from "../desktop-connection-failure";
 import { QUERY_ENDED_ERROR } from "../approvals/query-ended";
 
+/**
+ * The name a granted tool goes by on the wire to the harness.
+ *
+ * OpenBot names a granted tool `mcp__<server>__<tool>`, and the Claude harness prefixes every tool it
+ * is handed with its own `mcp__ag_ui__`. Claude then saw `mcp__ag_ui__mcp__composio-linear__…`, took
+ * the inner `mcp__composio-linear__…` for the real name, and called that. The SDK refused it ("No
+ * such tool available") and the Bot reported an outage. Without the inner prefix the harness offers
+ * one ordinary MCP name, `mcp__ag_ui__composio-linear__…`, with nothing inside it to copy.
+ */
+export const wireToolName = (name: string) =>
+  name.startsWith("mcp__") ? name.slice("mcp__".length) : name;
+
 // Use the model contract of the runtime we actually ship, without a second AI SDK version.
 export type PlanLanguageModel = Extract<
   BuiltInAgentClassicConfig["model"],
@@ -119,7 +131,7 @@ export function planMessages(prompt: Options["prompt"]): Message[] {
                 id: part.toolCallId,
                 type: "function" as const,
                 function: {
-                  name: part.toolName,
+                  name: wireToolName(part.toolName),
                   arguments: JSON.stringify(part.input),
                 },
               },
@@ -260,12 +272,18 @@ export class PlanModel implements PlanLanguageModel {
           "Built-in plan Bots only support caller-owned function tools.",
         );
       return {
-        name: tool.name,
+        name: wireToolName(tool.name),
         description: tool.description ?? "",
         parameters: tool.inputSchema,
       };
     });
-    const names = new Set(tools.map((tool) => tool.name));
+    // Wire name back to the granted name every other part of OpenBot knows.
+    const granted = new Map(
+      (options.tools ?? []).map((tool) => [wireToolName(tool.name), tool.name]),
+    );
+    if (granted.size !== tools.length)
+      throw new Error("Two offered tools share a name on the plan harness.");
+    const names = new Set(granted.keys());
     const agent = new HttpAgent({
       url: this.config.endpoint.href,
       headers: { "x-openbot-agent-token": this.config.token },
@@ -361,11 +379,11 @@ export class PlanModel implements PlanLanguageModel {
                   case "TOOL_CALL_START":
                     if (!names.has(event.toolCallName)) {
                       /*
-                       * Claude sometimes copies a granted tool's name from the conversation without
-                       * the harness's `mcp__ag_ui__` prefix, and the harness strips what is left down
-                       * to the bare vendor name. The SDK refuses that call itself and tells Claude,
-                       * who then retries with the real name, so the call is left out here rather than
-                       * ending the turn. Anything that is not such a near miss is still refused.
+                       * Claude sometimes calls a granted tool without the harness's `mcp__ag_ui__`
+                       * prefix (see wireToolName), and the harness strips what is left down to the
+                       * bare vendor name. The SDK refuses that call itself and tells Claude, so the
+                       * call is left out here rather than ending the turn. Anything that is not such
+                       * a near miss is still refused.
                        */
                       if (
                         [...names].some((name) =>
@@ -379,15 +397,17 @@ export class PlanModel implements PlanLanguageModel {
                         `The plan harness attempted an unoffered tool: ${event.toolCallName}`,
                       );
                     }
+                    const name =
+                      granted.get(event.toolCallName) ?? event.toolCallName;
                     calls.set(event.toolCallId, {
-                      name: event.toolCallName,
+                      name,
                       args: "",
                       ended: false,
                     });
                     controller.enqueue({
                       type: "tool-input-start",
                       id: event.toolCallId,
-                      toolName: event.toolCallName,
+                      toolName: name,
                     });
                     break;
                   case "TOOL_CALL_ARGS": {
