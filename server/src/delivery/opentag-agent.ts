@@ -317,23 +317,25 @@ async function answer(
   const approvalId = result.extras.approvals[0];
   const parts = [result.replyText, ...questions].filter(Boolean);
   if (questions.length) parts.push("Reply here to answer.");
-  if (approvalId && !sender.private) {
-    // An approval card shows what the Bot wants to do; in a shared thread that goes to the owner
-    // directly, like the rest of a private answer, and the thread only says it is waiting.
-    await notifyApprovals(deps, result);
-    parts.push(
-      "I need your approval before I continue, so I sent the request to you directly.",
-    );
-  } else if (approvalId) {
+  if (approvalId) {
+    // The card names its approver, OpenTag lets only that person press it, and the decision is
+    // made only as their binding's owner — so in a shared thread (reached only when its answers are
+    // posted there anyway) it is shown in place rather than sent away to the owner's DM.
     const card = await approvalCard(deps, result.binding, approvalId);
     if (result.extras.approvals.length > 1)
       parts.push(
         `${result.extras.approvals.length - 1} more approval request(s) are waiting on the Bot's page in OpenBot.`,
       );
     if (card) return { text: parts.join("\n\n"), interrupt: card };
-    parts.push(
-      "Your Bot is waiting for an approval. Open the Bot's page in OpenBot to review it.",
-    );
+    if (!sender.private) {
+      await notifyApprovals(deps, result);
+      parts.push(
+        "I need your approval before I continue, so I sent the request to you directly.",
+      );
+    } else
+      parts.push(
+        "Your Bot is waiting for an approval. Open the Bot's page in OpenBot to review it.",
+      );
   } else if (result.kind === "waiting" && !parts.length) {
     parts.push("Your Bot is waiting for a person. Open OpenBot to continue.");
   }
