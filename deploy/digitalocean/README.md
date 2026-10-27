@@ -81,9 +81,13 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
    in the AP Venture Slack workspace, leave **Socket Mode off**, choose **Reinstall to Workspace**
    under OAuth & Permissions, then run the `resumeCommand`.
 2. In `.env`, set `OPENTAG_SHARED_SECRET` (at least 32 characters) and keep `OPENTAG_URL` and
-   `INTELLIGENCE_CHANNEL_NAME=digital-factory` as they are.
+   `INTELLIGENCE_CHANNEL_NAME=digital-factory` as they are. Set `OPENTAG_SLACK_BOT_TOKEN` to the
+   app's **Bot User OAuth Token** (`xoxb-`, on the app's **OAuth & Permissions** page). While there,
+   check **Bot Token Scopes** has `chat:write`, `chat:write.customize`, `channels:read` and
+   `groups:read`; add any that are missing and **Reinstall to Workspace**.
 3. `docker compose --env-file .env --profile slack up -d --build`. The first build takes a few
-   minutes: OpenTag is built from its `openbot-pairing` branch because no release has it yet.
+   minutes: OpenTag is built from our copy of its `openbot-pairing` branch
+   (Ascentwright-Capital/OpenTag), because no release has the pairing yet.
 4. In Slack, `/invite @Factory` to the channels it should work in.
 5. Each person opens the Orchestrator's page in OpenBot, **Reaching you**, **Connect**, and sends the
    `link <code>` it shows to @Factory in a direct message within ten minutes.
@@ -91,11 +95,12 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
 Check it from a real account: a mention gets a reply, a follow-up in that thread gets a reply, an
 unmentioned message in a new conversation gets silence.
 
-**Not working yet, upstream:** OpenTag's pairing branch does not implement OpenBot's proactive
-sends or channel-membership checks. Live replies work. Replies that come after an approval, a
-Bot's questions, routine results and Slack triggers do not reach Slack; they show in the OpenBot
-web and mobile apps instead, and fail visibly in OpenBot's delivery outbox. Move `OPENTAG_REF` to a
-newer commit once upstream adds them.
+**Where answers go.** In a direct message with @Factory, the answer comes back in the DM. In a
+channel, OpenBot keeps the answer out of the channel, because it may draw on the person's private
+Bot, and sends it to their DM instead; the channel gets a one-line notice. Replies after an
+approval, a Bot's questions and routine results also arrive by DM. All of these come through our
+OpenTag's `/openbot/deliver`, so they need `OPENTAG_SLACK_BOT_TOKEN`; without it they show only in
+the OpenBot app and fail visibly in its delivery outbox.
 
 ## Update
 
@@ -128,7 +133,7 @@ git checkout -b chore/sync-upstream-<date> && git merge upstream/main
   container. docs/deployment.md calls this fine for one team that trusts its own Bots. A computer per
   Bot needs the supervisor (or the Helm chart on a cluster), and is the next step once more than a
   few Bots or any untrusted Bot run here.
-- **Slack is partial.** Live replies only, until OpenTag implements OpenBot's proactive sends (see
-  "Slack"). Everything else is in the OpenBot web and mobile apps.
+- **Slack answers privately.** Answers asked for in a channel go to the asker's DM, not the
+  channel (see "Slack"). Shared coworkers that answer in the channel are AP-92.
 - **One Slack identity.** Every coworker answers through @Factory, under its own name. A Slack
   app and @handle per coworker is AP-92.
