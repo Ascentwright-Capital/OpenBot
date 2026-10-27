@@ -45,6 +45,14 @@ sshd -t
 # Ubuntu 24.04 starts sshd from ssh.socket, so ssh.service may be inactive; it reads the file on start.
 systemctl try-reload-or-restart ssh
 
+# fail2ban bans an address after a few failed SSH logins. Never ban our own Tailscale network,
+# which is how operators reach the droplet when their network blocks its public address.
+cat > /etc/fail2ban/jail.d/digital-factory.local <<'JAIL'
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10
+JAIL
+systemctl restart fail2ban
+
 # Only SSH and the web. Docker publishes ports past ufw, so compose.yaml publishes only Caddy.
 ufw default deny incoming
 ufw default allow outgoing
