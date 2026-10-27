@@ -328,6 +328,49 @@ test("a suspended governed turn reports its pending approval", async () => {
   ).toMatchObject({ kind: "waiting", extras: { approvals: ["a9"] } });
   expect(f.statuses.at(-1)).toMatchObject({ state: "accepted" });
 });
+test("a second paired message waits for the first turn instead of colliding with it", async () => {
+  const f = fixture();
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  const started: string[] = [];
+  const router = createDeliveryRouter({
+    store: f.store,
+    queue: f.queue,
+    owner: "w",
+    authoriseScope: async () => true,
+    runTurn: async (input) => {
+      started.push(input.text);
+      if (input.text === "first") await gate;
+      return { replyText: `re: ${input.text}` };
+    },
+    providers: {},
+  });
+  const message = (text: string, signal = new AbortController().signal) =>
+    router.converse({
+      transport: "slack",
+      realm: "T",
+      identity: "U",
+      externalId: text,
+      text,
+      signal,
+    });
+  const first = message("first");
+  const second = message("second");
+  const gaveUp = new AbortController();
+  const third = message("third", gaveUp.signal);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(started).toEqual(["first"]);
+  gaveUp.abort();
+  expect(await third).toMatchObject({
+    kind: "failed",
+    message:
+      "I'm still working on your previous message. Send this one again once I've answered.",
+  });
+  open();
+  expect(await first).toMatchObject({ kind: "replied", replyText: "re: first" });
+  expect(await second).toMatchObject({ kind: "replied", replyText: "re: second" });
+  expect(started).toEqual(["first", "second"]);
+});
 test("chat sends carry the Bot's identity; SMS after STOP is recorded opted out, not sent", async () => {
   const f = fixture();
   await f.router.sweep("delivery.outbound");
