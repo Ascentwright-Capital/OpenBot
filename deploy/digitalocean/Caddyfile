@@ -1,5 +1,15 @@
 # TLS for the digital factory. Caddy fetches and renews the certificate for OPENBOT_DOMAIN.
 {$OPENBOT_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy openbot:3001
+	reverse_proxy openbot:3001 {
+		# OpenBot answers 502 with a JSON reason when a third party (Composio, a model provider)
+		# refuses. Cloudflare replaces any origin 502 with its own "Bad gateway" page, so the
+		# browser lost the reason. 424 carries the same body through. Caddy's own 502, when
+		# OpenBot is down, is not an upstream response and stays a 502.
+		@refused status 502
+		handle_response @refused {
+			copy_response_headers
+			copy_response 424
+		}
+	}
 }
