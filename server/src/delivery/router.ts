@@ -66,6 +66,26 @@ type RouterStore = Pick<
   | "setSmsOptOut"
   | "botIdentity"
 >;
+/**
+ * The person is told only that the turn failed, so the reason goes to the operator's log: the
+ * error's name and message down its cause chain, never the error object itself.
+ */
+function logTurnFailure(inboxId: string, error: unknown): void {
+  const reasons: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    reasons.push(
+      current instanceof Error
+        ? `${current.name}: ${current.message}`.slice(0, 500)
+        : String(current).slice(0, 500),
+    );
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  console.error(
+    JSON.stringify({ type: "delivery-turn-failed", inboxId, reasons }),
+  );
+}
+
 /** How long a paired chat message waits for the same person's previous turn to finish. */
 const BUSY_WAIT_MS = 180_000;
 
@@ -354,6 +374,7 @@ export function createDeliveryRouter(deps: {
         error instanceof DeliveryRefusedError
           ? error.message
           : "The agent turn failed. Inspect the conversation before retrying.";
+      if (!(error instanceof DeliveryRefusedError)) logTurnFailure(row.id, error);
       await deps.store.setInbox(row.id, "failed", message);
       await deps.audit?.({
         ...scope,
@@ -444,6 +465,7 @@ export function createDeliveryRouter(deps: {
         });
       } catch (error) {
         if (!(await owns())) return;
+        if (!(error instanceof DeliveryRefusedError)) logTurnFailure(row.id, error);
         await deps.store.setInbox(
           row.id,
           "failed",

@@ -519,7 +519,7 @@ test("in a conversation others may read, the answer goes to the owner privately"
     expect(sent[0]?.text).toBe("Your salary review is attached.");
   }
 });
-test("with OPENTAG_ANSWER_IN_CHANNELS, a shared thread gets the answer and approvals still go privately", async () => {
+test("with OPENTAG_ANSWER_IN_CHANNELS, a shared thread gets the answer and the approval card", async () => {
   const f = fixture({
     answerInChannels: true,
     converse: {
@@ -542,16 +542,18 @@ test("with OPENTAG_ANSWER_IN_CHANNELS, a shared thread gets the answer and appro
       "Leads are up 12% this week.",
       "Research Bot asks: which quarter?",
       "Reply here to answer.",
-      "I need your approval before I continue, so I sent the request to you directly.",
     ].join("\n\n"),
   );
-  expect(
-    result.events.some((e) => e.type === "CUSTOM" && e.name === "on_interrupt"),
-  ).toBe(false);
+  const interrupt = result.events.find(
+    (e) => e.type === "CUSTOM" && e.name === "on_interrupt",
+  ) as { value?: unknown } | undefined;
+  expect(interrupt).toBeDefined();
+  // Only the linked owner may press it.
+  expect(JSON.stringify(interrupt?.value)).toContain("slack:U1");
   const sent = f.calls
     .map((c) => (c as { notify?: [unknown, { kind: string }] }).notify?.[1])
     .filter(Boolean);
-  expect(sent.map((n) => n?.kind)).toEqual(["approval"]);
+  expect(sent).toEqual([]);
 });
 test("verified Slack events feed the owners' triggers once, and observe-only runs stay quiet", async () => {
   const f = fixture();
