@@ -1,0 +1,99 @@
+# Digital factory on DigitalOcean
+
+AP Venture runs this fork of OpenBot on one DigitalOcean droplet in Singapore. People reach the
+Bots in Slack and in the web app. Linear tracks the work: project Digital factory, AP-84 and its
+sub-issues; the platform choice is D-67.
+
+| Piece | What it is |
+| --- | --- |
+| `compose.yaml` | The all-in-one OpenBot image with its own PostgreSQL, the Claude harness, and Caddy for TLS |
+| `setup.sh` | One-time hardening and Docker install for a fresh Ubuntu 24.04 droplet |
+| `sweeps.sh` | Fires due routines and culls unsent attachments; host cron runs it |
+| `Caddyfile` | HTTPS for `OPENBOT_DOMAIN`, certificates from Let's Encrypt |
+| `.env.example` | Every setting this deployment needs, with where each value comes from |
+
+## Before you start
+
+You need these accounts (AP-85), all owned by the company account, not a personal one:
+
+1. A domain, and a DNS name for the factory, for example `factory.<company domain>`.
+2. Google Workspace on that domain, and an OAuth client (Google Cloud console, "Web application")
+   with redirect URI `https://<factory domain>/api/auth/callback/google`.
+3. A Claude plan on the company account. On any machine with Claude Code, sign in as that account
+   and run `claude setup-token`; the printed token is `CLAUDE_CODE_OAUTH_TOKEN`.
+4. CopilotKit Intelligence, free plan: `npx --yes copilotkit@latest project select` prints the key.
+5. A DigitalOcean account.
+
+## 1. Create the droplet
+
+Ubuntu 24.04, region SGP1, Basic, 8 GB / 4 vCPU (docs/deployment.md recommends 4 GB for a handful of
+Bots; the extra room is for the browser). Add your SSH key and turn on backups. Point the DNS name
+at the droplet's IP.
+
+## 2. Harden it
+
+```sh
+scp deploy/digitalocean/setup.sh root@<ip>:
+ssh root@<ip> "sh setup.sh '$(cat ~/.ssh/id_ed25519.pub)'"
+```
+
+After this, root cannot log in over SSH. Use `ssh factory@<ip>`.
+
+## 3. Deploy
+
+```sh
+ssh factory@<ip>
+git clone https://github.com/Ascentwright-Capital/OpenBot /opt/digital-factory
+cd /opt/digital-factory/deploy/digitalocean
+cp .env.example .env && chmod 600 .env
+# Fill in .env. Generate each secret with: openssl rand -base64 32
+docker compose --env-file .env up -d
+docker compose --env-file .env logs -f openbot
+```
+
+The first start creates the database and runs migrations. Sign in at `https://<factory domain>`
+with an address listed in `INITIAL_ADMIN_EMAILS`.
+
+Cloning needs read access to this private repo: a deploy key (read-only) on the repo is enough.
+
+## Claude: plan or key
+
+`CLAUDE_CODE_OAUTH_TOKEN` runs the built-in Bots on the company Claude plan, through the
+`agent-claude-sdk` harness. If Anthropic changes what a plan may be used for, switch to the key:
+empty `CLAUDE_CODE_OAUTH_TOKEN`, set `BOT_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` (with a
+spending cap in the Anthropic Console), and `docker compose --env-file .env up -d`. Never set both;
+the harness refuses to start if you do.
+
+## Update
+
+```sh
+cd /opt/digital-factory && git pull
+# Edit OPENBOT_VERSION in deploy/digitalocean/.env to the release you want.
+cd deploy/digitalocean && docker compose --env-file .env pull && docker compose --env-file .env up -d
+```
+
+Read the release's `CHANGELOG.md` entry first. Upstream is alpha and says so.
+
+## Sync the fork with upstream
+
+```sh
+git remote add upstream https://github.com/CopilotKit/openbot   # once
+git fetch upstream main
+git checkout -b chore/sync-upstream-<date> && git merge upstream/main
+# Open a PR into main. Our changes live under deploy/ and do not collide with upstream.
+```
+
+## Back up
+
+- Droplet backups (weekly, DigitalOcean) cover the volumes.
+- `KEY_ENCRYPTION_KEY` and `.env` go in the company password manager as well. Without the key,
+  stored credentials cannot be decrypted, even from a backup.
+
+## Known limits of v1
+
+- **One shared browser.** Every Bot shares the browser, logins and files inside the openbot
+  container. docs/deployment.md calls this fine for one team that trusts its own Bots. A computer per
+  Bot needs the supervisor (or the Helm chart on a cluster), and is the next step once more than a
+  few Bots or any untrusted Bot run here.
+- **Slack is not wired yet.** That is AP-88: deploy OpenTag and pair it (docs/configuration.md,
+  "Slack and Microsoft Teams").

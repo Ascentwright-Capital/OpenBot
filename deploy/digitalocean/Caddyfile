@@ -1,0 +1,5 @@
+# TLS for the digital factory. Caddy fetches and renews the certificate for OPENBOT_DOMAIN.
+{$OPENBOT_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy openbot:3001
+}

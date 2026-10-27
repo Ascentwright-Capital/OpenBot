@@ -1,0 +1,72 @@
+# AP Venture digital factory on one DigitalOcean droplet.
+#
+# openbot           the all-in-one image: app, API, the shared browser and its own PostgreSQL.
+# agent-claude-sdk  the Claude harness. Built-in Bots run on the company Claude plan through it.
+# caddy             TLS in front of port 3001, with certificates from Let's Encrypt.
+#
+# The routine and attachment sweeps run from host cron through sweeps.sh, because the embedded
+# PostgreSQL only listens inside the openbot container (docs/deployment.md, "Not in it").
+#
+# Every Bot shares the one browser in v1. That is the trade docs/deployment.md describes as fine for
+# one team that trusts its own Bots. A computer per Bot needs the supervisor and is a later step.
+#
+# Run from this directory: docker compose --env-file .env up -d
+
+services:
+  openbot:
+    image: ghcr.io/copilotkit/openbot:${OPENBOT_VERSION:?set OPENBOT_VERSION in .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      EMBEDDED_POSTGRES: "on"
+      PICKED_HARNESS_IMAGE: ghcr.io/copilotkit/openbot-agent-claude-sdk:${OPENBOT_VERSION}
+      PICKED_HARNESS_URL: http://agent-claude-sdk:4212
+    volumes:
+      # The parent of the data directory, not the data directory itself (docs/deployment.md).
+      - openbot-postgres:/var/lib/postgresql
+      - openbot-workspace:/workspace
+    expose:
+      - "3001"
+    depends_on:
+      agent-claude-sdk:
+        condition: service_healthy
+
+  agent-claude-sdk:
+    image: ghcr.io/copilotkit/openbot-agent-claude-sdk:${OPENBOT_VERSION}
+    restart: unless-stopped
+    environment:
+      # One of the two, never both: the harness refuses to start with both set.
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MANAGED_AGENT_TOKEN: ${MANAGED_AGENT_TOKEN:?set MANAGED_AGENT_TOKEN in .env}
+      OPENBOT_TOOL_URL: http://openbot:3001/api/agent-tools/call
+      AGENT_TOOL_TOKEN: ${AGENT_TOOL_TOKEN:-}
+    expose:
+      - "4212"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4212/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      OPENBOT_DOMAIN: ${OPENBOT_DOMAIN:?set OPENBOT_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - openbot
+
+volumes:
+  openbot-postgres:
+  openbot-workspace:
+  caddy-data:
+  caddy-config:
