@@ -83,8 +83,8 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
 2. In `.env`, set `OPENTAG_SHARED_SECRET` (at least 32 characters) and keep `OPENTAG_URL` and
    `INTELLIGENCE_CHANNEL_NAME=digital-factory` as they are. Set `OPENTAG_SLACK_BOT_TOKEN` to the
    app's **Bot User OAuth Token** (`xoxb-`, on the app's **OAuth & Permissions** page). While there,
-   check **Bot Token Scopes** has `chat:write`, `chat:write.customize`, `channels:read` and
-   `groups:read`; add any that are missing and **Reinstall to Workspace**.
+   check **Bot Token Scopes** has `chat:write`, `im:write`, `chat:write.customize`,
+   `channels:read` and `groups:read`; add any that are missing and **Reinstall to Workspace**.
 3. `docker compose --env-file .env --profile slack up -d --build`. The first build takes a few
    minutes: OpenTag is built from our copy of its `openbot-pairing` branch
    (Ascentwright-Capital/OpenTag), because no release has the pairing yet.

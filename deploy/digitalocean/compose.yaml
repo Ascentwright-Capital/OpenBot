@@ -61,9 +61,9 @@ services:
   opentag:
     profiles: ["slack"]
     build:
-      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-5e7c85d19ca0ba2ba47acf6464bbb8f0b242759e}
+      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-b2c4823a203f9f43d4bde2d688cad06f8f897ced}
       dockerfile: deployment/docker/runtime.Dockerfile
-    image: digital-factory/opentag-runtime:${OPENTAG_REF:-5e7c85d19ca0ba2ba47acf6464bbb8f0b242759e}
+    image: digital-factory/opentag-runtime:${OPENTAG_REF:-b2c4823a203f9f43d4bde2d688cad06f8f897ced}
     restart: unless-stopped
     environment:
       AGENT_URL: http://openbot:3001/api/delivery/webhooks/opentag/agent
