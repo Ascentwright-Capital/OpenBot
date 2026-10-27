@@ -36,6 +36,12 @@ export type OpenTagConfig = {
   url?: string;
   /** Optional `{seed}`/`{agentId}` template for a public PNG avatar Slack can show as the Bot's icon. */
   iconUrlTemplate?: string;
+  /**
+   * Answer in the Slack thread or Teams conversation the person asked in, even when others can read
+   * it (`OPENTAG_ANSWER_IN_CHANNELS`). Off by default, because the answer comes from the person's
+   * own conversation with their Bot. Meant for a team whose Bots work for the team as a whole.
+   */
+  answerInChannels?: boolean;
   fetch?: ProviderFetch;
 };
 

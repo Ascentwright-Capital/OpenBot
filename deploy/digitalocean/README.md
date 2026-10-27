@@ -98,11 +98,14 @@ Check it from a real account: a mention gets a reply, a follow-up in that thread
 unmentioned message in a new conversation gets silence.
 
 **Where answers go.** In a direct message with @Factory, the answer comes back in the DM. In a
-channel, OpenBot keeps the answer out of the channel, because it may draw on the person's private
-Bot, and sends it to their DM instead; the channel gets a one-line notice. Replies after an
-approval, a Bot's questions and routine results also arrive by DM. All of these come through our
-OpenTag's `/openbot/deliver`, so they need `OPENTAG_SLACK_BOT_TOKEN`; without it they show only in
-the OpenBot app and fail visibly in its delivery outbox.
+channel thread, with `OPENTAG_ANSWER_IN_CHANNELS=true` (our setting), the coworker answers in that
+thread for everyone there to read; approval requests still go to the asker's DM. With it off,
+OpenBot's default, the channel gets a one-line notice and the answer goes to the asker's DM. Replies
+after an approval, a Bot's questions and routine results arrive by DM through our OpenTag's
+`/openbot/deliver`, which needs `OPENTAG_SLACK_BOT_TOKEN`.
+
+Only people who linked their Slack (step 5) get answers; anyone else is told how to link. Each
+person's messages reach their own linked Bot.
 
 ## Coworkers (AP-89)
 
@@ -130,6 +133,11 @@ cd deploy/digitalocean && docker compose --env-file .env pull && docker compose 
 
 Read the release's `CHANGELOG.md` entry first. Upstream is alpha and says so.
 
+The `openbot` image is built here, not pulled: from our `factory/<version>` branch, which is the
+release plus our own server changes (today `OPENTAG_ANSWER_IN_CHANNELS`). To move to a new release,
+branch `factory/<new version>` from its tag, cherry-pick our changes onto it, point the `openbot`
+build in `compose.yaml` at the new commit, and run `docker compose --env-file .env up -d --build`.
+
 ## Sync the fork with upstream
 
 ```sh
@@ -151,7 +159,8 @@ git checkout -b chore/sync-upstream-<date> && git merge upstream/main
   container. docs/deployment.md calls this fine for one team that trusts its own Bots. A computer per
   Bot needs the supervisor (or the Helm chart on a cluster), and is the next step once more than a
   few Bots or any untrusted Bot run here.
-- **Slack answers privately.** Answers asked for in a channel go to the asker's DM, not the
-  channel (see "Slack"). Shared coworkers that answer in the channel are AP-92.
+- **Answers come from the asker's own Bot.** A channel thread is answered by whichever Bot the
+  asker linked, from that person's conversation with it. Coworkers shared by the whole team, each
+  with its own Slack app, are AP-92.
 - **One Slack identity.** Every coworker answers through @Factory, under its own name. A Slack
   app and @handle per coworker is AP-92.

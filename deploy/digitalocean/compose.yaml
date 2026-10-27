@@ -14,8 +14,12 @@
 # Run from this directory: docker compose --env-file .env up -d
 
 services:
+  # Built from our factory/v0.2.0 branch: the {OPENBOT_VERSION} release plus our own changes
+  # (OPENTAG_ANSWER_IN_CHANNELS, AP-92). Pinned to a commit; the first build takes several minutes.
   openbot:
-    image: ghcr.io/copilotkit/openbot:${OPENBOT_VERSION:?set OPENBOT_VERSION in .env}
+    build:
+      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-cf2d1706cb689f5f0c799af1bd5e8fba428a7ec4}
+    image: digital-factory/openbot:${OPENBOT_REF:-cf2d1706cb689f5f0c799af1bd5e8fba428a7ec4}
     restart: unless-stopped
     env_file: .env
     environment:
