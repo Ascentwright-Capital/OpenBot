@@ -253,7 +253,8 @@ class OpenBotClaudeAgentAdapter(ClaudeAgentAdapter):
             else:
                 if input_data.messages and input_data.messages[-1].role == "tool":
                     yield RunErrorEvent(
-                        message="The Claude query for this tool result is no longer running. Start a new message."
+                        message="The Claude query for this tool result is no longer running. Start a new message.",
+                        code="OPENBOT_QUERY_ENDED",
                     )
                     return
                 turn = _Turn(tool_names={tool.name for tool in input_data.tools})
