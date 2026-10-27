@@ -99,7 +99,7 @@ unmentioned message in a new conversation gets silence.
 
 **Where answers go.** In a direct message with @Factory, the answer comes back in the DM. In a
 channel thread, with `OPENTAG_ANSWER_IN_CHANNELS=true` (our setting), the coworker answers in that
-thread for everyone there to read; approval requests still go to the asker's DM. With it off,
+thread for everyone there to read; approval requests show there as Approve/Deny buttons only the asker can press. With it off,
 OpenBot's default, the channel gets a one-line notice and the answer goes to the asker's DM. Replies
 after an approval, a Bot's questions and routine results arrive by DM through our OpenTag's
 `/openbot/deliver`, which needs `OPENTAG_SLACK_BOT_TOKEN`.

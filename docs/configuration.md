@@ -473,7 +473,7 @@ Slack app of its own.
 | `OPENTAG_SHARED_SECRET`         | Enables the pairing. At least 32 characters. OpenTag must send `Authorization: Bearer <secret>` (its `AGENT_AUTH_HEADER`), and OpenBot sends the same header on proactive posts. |
 | `OPENTAG_URL`                   | OpenTag's base URL, for messages sent when no Slack turn is open (replies after an approval, responsibility progress, questions). Without it those sends fail visibly in the outbox, and Slack triggers are refused because channel membership cannot be checked. |
 | `OPENTAG_BOT_ICON_URL_TEMPLATE` | Optional `https` PNG URL with `{seed}` (the Bot's avatar seed) or `{agentId}`, used as the Bot's Slack icon on proactive posts.                                                    |
-| `OPENTAG_ANSWER_IN_CHANNELS` | `true` answers in the Slack thread or Teams chat the person asked in, even when others can read it. Approval requests still go to the person directly. Default `false`: the answer goes to the person directly and the shared conversation gets a one-line notice. For a team whose Bots work for everyone in the channel. |
+| `OPENTAG_ANSWER_IN_CHANNELS` | `true` answers in the Slack thread or Teams chat the person asked in, even when others can read it. Approval requests show there as buttons only that person can press. Default `false`: the answer goes to the person directly and the shared conversation gets a one-line notice. For a team whose Bots work for everyone in the channel. |
 
 Point OpenTag's `AGENT_URL` at `<public URL>/api/delivery/webhooks/opentag/agent`. A person links
 their Slack or Teams identity from a Bot's page, under **Reaching you**: OpenBot shows a one-time `link <code>` message,
