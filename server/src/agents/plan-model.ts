@@ -285,6 +285,8 @@ export class PlanModel implements PlanLanguageModel {
           string,
           { name: string; args: string; ended: boolean }
         >();
+        /** Near-miss calls the SDK refuses on its own; see TOOL_CALL_START. */
+        const skipped = new Set<string>();
         let terminal = false;
         const fail = (error: unknown) => {
           if (!terminal) {
@@ -355,10 +357,26 @@ export class PlanModel implements PlanLanguageModel {
                     });
                     break;
                   case "TOOL_CALL_START":
-                    if (!names.has(event.toolCallName))
+                    if (!names.has(event.toolCallName)) {
+                      /*
+                       * Claude sometimes copies a granted tool's name from the conversation without
+                       * the harness's `mcp__ag_ui__` prefix, and the harness strips what is left down
+                       * to the bare vendor name. The SDK refuses that call itself and tells Claude,
+                       * who then retries with the real name, so the call is left out here rather than
+                       * ending the turn. Anything that is not such a near miss is still refused.
+                       */
+                      if (
+                        [...names].some((name) =>
+                          name.endsWith(`__${event.toolCallName}`),
+                        )
+                      ) {
+                        skipped.add(event.toolCallId);
+                        break;
+                      }
                       throw new Error(
                         `The plan harness attempted an unoffered tool: ${event.toolCallName}`,
                       );
+                    }
                     calls.set(event.toolCallId, {
                       name: event.toolCallName,
                       args: "",
@@ -371,6 +389,7 @@ export class PlanModel implements PlanLanguageModel {
                     });
                     break;
                   case "TOOL_CALL_ARGS": {
+                    if (skipped.has(event.toolCallId)) break;
                     const call = calls.get(event.toolCallId);
                     if (!call || call.ended)
                       throw new Error("Unexpected plan tool arguments.");
@@ -383,6 +402,7 @@ export class PlanModel implements PlanLanguageModel {
                     break;
                   }
                   case "TOOL_CALL_END": {
+                    if (skipped.has(event.toolCallId)) break;
                     const call = calls.get(event.toolCallId);
                     if (!call || call.ended)
                       throw new Error("Unexpected plan tool completion.");

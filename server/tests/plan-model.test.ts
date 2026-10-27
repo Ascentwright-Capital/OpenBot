@@ -198,6 +198,55 @@ test("the bridge refuses an unoffered native tool instead of executing it", asyn
   }
 });
 
+test("a granted tool's name without its prefix is left to the SDK to refuse, and the turn goes on", async () => {
+  const server = Bun.serve({
+    port: 0,
+    fetch: async (request) => {
+      const body = await request.json();
+      return new Response(
+        [
+          { type: "RUN_STARTED", threadId: body.threadId, runId: body.runId },
+          {
+            type: "TOOL_CALL_START",
+            toolCallId: "near-miss",
+            toolCallName: "LINEAR_CREATE_LINEAR_COMMENT",
+          },
+          { type: "TOOL_CALL_ARGS", toolCallId: "near-miss", delta: "{}" },
+          { type: "TOOL_CALL_END", toolCallId: "near-miss" },
+          { type: "TEXT_MESSAGE_START", messageId: "m", role: "assistant" },
+          { type: "TEXT_MESSAGE_CONTENT", messageId: "m", delta: "Done." },
+          { type: "TEXT_MESSAGE_END", messageId: "m" },
+          { type: "RUN_FINISHED", threadId: body.threadId, runId: body.runId },
+        ]
+          .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+          .join(""),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    },
+  });
+  try {
+    const model = new PlanModel(
+      { provider: "claude", endpoint: server.url, token: "owned" },
+      "knowledge",
+      { threadId: "channel" },
+    );
+    const result = await model.doGenerate({
+      prompt: [{ role: "user", content: [{ type: "text", text: "Comment" }] }],
+      tools: [
+        {
+          type: "function",
+          name: "mcp__composio-linear__LINEAR_CREATE_LINEAR_COMMENT",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    });
+    expect(result.content).toEqual([{ type: "text", text: "Done." }]);
+    expect(result.finishReason.unified).toBe("stop");
+  } finally {
+    server.stop(true);
+  }
+});
+
 test("the original built-in executes its granted tool and sends the actual matching result", async () => {
   const requests: Record<string, unknown>[] = [];
   const executions: string[] = [];
