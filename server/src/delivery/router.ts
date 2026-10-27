@@ -66,6 +66,32 @@ type RouterStore = Pick<
   | "setSmsOptOut"
   | "botIdentity"
 >;
+/** How long a paired chat message waits for the same person's previous turn to finish. */
+const BUSY_WAIT_MS = 180_000;
+
+/** Whether `previous` settles within `ms`, giving up early if `signal` aborts. */
+function settledWithin(
+  previous: Promise<unknown>,
+  ms: number,
+  signal: AbortSignal,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const done = (settled: boolean) => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve(settled);
+    };
+    const onAbort = () => done(false);
+    const timer = setTimeout(() => done(false), ms);
+    if (signal.aborted) return done(false);
+    signal.addEventListener("abort", onAbort, { once: true });
+    previous.then(
+      () => done(true),
+      () => done(true),
+    );
+  });
+}
+
 export function createDeliveryRouter(deps: {
   store: RouterStore;
   queue: Pick<WorkQueue, "claim" | "renew" | "finish" | "release">;
@@ -114,6 +140,8 @@ export function createDeliveryRouter(deps: {
    * than also sent as a second, proactive message to the same person.
    */
   const inline = new Map<string, InlineTurnExtras>();
+  /** The paired chat turn running (or queued) last on each binding in this process. */
+  const running = new Map<string, Promise<void>>();
   async function notify(
     scope: DeliveryScope,
     input: {
@@ -253,8 +281,19 @@ export function createDeliveryRouter(deps: {
     // Slack responsibilities are fed by the pairing route through `ingestSlackEvent`, once per
     // event, so the turn itself does not also emit one.
     const extras: InlineTurnExtras = { approvals: [], questions: [] };
-    inline.set(binding.id, extras);
+    // One turn per binding at a time: a second message while the first is still running would
+    // fail on the Intelligence thread lock, so it waits for the first instead.
+    const previous = running.get(binding.id);
+    let release!: () => void;
+    const mine = new Promise<void>((resolve) => (release = resolve));
+    const turn = (previous ?? Promise.resolve()).then(() => mine);
+    running.set(binding.id, turn);
     try {
+      if (previous && !(await settledWithin(previous, BUSY_WAIT_MS, input.signal)))
+        throw new DeliveryRefusedError(
+          "I'm still working on your previous message. Send this one again once I've answered.",
+        );
+      inline.set(binding.id, extras);
       const result = await deps.runTurn({
         ...scope,
         runId: row.id,
@@ -325,6 +364,8 @@ export function createDeliveryRouter(deps: {
       return { kind: "failed", binding, inboxId: row.id, message };
     } finally {
       if (inline.get(binding.id) === extras) inline.delete(binding.id);
+      release();
+      if (running.get(binding.id) === turn) running.delete(binding.id);
     }
   }
   async function deliver(
