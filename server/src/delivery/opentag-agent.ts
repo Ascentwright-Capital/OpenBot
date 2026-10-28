@@ -197,6 +197,11 @@ export async function handleOpenTagRun(
     try {
       const outcome = await answer(deps, input, signal);
       say(outcome.text);
+      // Another Bot's answer, relayed by this one, in the same thread rather than a direct message.
+      if (outcome.followUp) {
+        const more = await outcome.followUp;
+        say(more ?? HANDOFF_REPLY_LATE);
+      }
       // The Bot's charts, drawn natively by the Channel when it offers its chart component.
       if (input.tools.some((tool) => tool.name === OPENTAG_CHART_TOOL))
         for (const component of outcome.components ?? []) {
@@ -249,6 +254,8 @@ async function answer(
   text: string;
   interrupt?: unknown;
   components?: DrawnComponent[];
+  /** The Bot's next reply, when this turn handed work to another Bot and is waiting on it. */
+  followUp?: Promise<string | null>;
 }> {
   // The Channel drew our chart and runs us again with its result; the turn already answered.
   if (isComponentFollowUp(input)) return { text: "" };
@@ -342,8 +349,23 @@ async function answer(
   return {
     text: parts.join("\n\n") || "Done.",
     ...(result.components ? { components: result.components } : {}),
+    // Listening as soon as the turn ends: the other Bot's answer comes back as this Bot's next reply.
+    ...(result.extras.handoffs > 0 && !approvalId
+      ? {
+          followUp: deps.router.awaitReply(
+            result.binding.id,
+            HANDOFF_REPLY_WAIT_MS,
+            signal,
+          ),
+        }
+      : {}),
   };
 }
+
+/** How long a turn that handed work to another Bot stays open to carry the answer into its thread. */
+const HANDOFF_REPLY_WAIT_MS = 120_000;
+const HANDOFF_REPLY_LATE =
+  "That is taking a while. I'll send you the answer directly when it's in.";
 
 /**
  * The conversation may include other people, and the turn's output comes from the owner's private

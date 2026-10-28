@@ -15,6 +15,8 @@ import {
 export type InlineTurnExtras = {
   approvals: string[];
   questions: { id: string; text: string }[];
+  /** Other Bots this turn handed work to. Their answer comes back as a later reply. */
+  handoffs: number;
 };
 export type ConverseResult =
   | { kind: "unbound" }
@@ -160,6 +162,8 @@ export function createDeliveryRouter(deps: {
    * than also sent as a second, proactive message to the same person.
    */
   const inline = new Map<string, InlineTurnExtras>();
+  /** The conversation each open paired turn runs in, so a hand-off can be tied back to it. */
+  const inlineThreads = new Map<string, string>();
   /** The paired chat turn running (or queued) last on each binding in this process. */
   const running = new Map<string, Promise<void>>();
   /**
@@ -191,6 +195,14 @@ export function createDeliveryRouter(deps: {
       awaiting.set(bindingId, take);
       if (signal?.aborted) stop();
     });
+  }
+  /** A Bot handed work on from `threadId`; the paired turn open there, if any, is told. */
+  function noteHandoff(threadId: string) {
+    for (const [bindingId, thread] of inlineThreads)
+      if (thread === threadId) {
+        const open = inline.get(bindingId);
+        if (open) open.handoffs += 1;
+      }
   }
   async function notify(
     scope: DeliveryScope,
@@ -335,7 +347,11 @@ export function createDeliveryRouter(deps: {
     if (!row) return { kind: "duplicate", binding };
     // Slack responsibilities are fed by the pairing route through `ingestSlackEvent`, once per
     // event, so the turn itself does not also emit one.
-    const extras: InlineTurnExtras = { approvals: [], questions: [] };
+    const extras: InlineTurnExtras = {
+      approvals: [],
+      questions: [],
+      handoffs: 0,
+    };
     // One turn per binding at a time: a second message while the first is still running would
     // fail on the Intelligence thread lock, so it waits for the first instead.
     const previous = running.get(binding.id);
@@ -352,6 +368,7 @@ export function createDeliveryRouter(deps: {
           "I'm still working on your previous message. Send this one again once I've answered.",
         );
       inline.set(binding.id, extras);
+      inlineThreads.set(binding.id, binding.threadId);
       const result = await deps.runTurn({
         ...scope,
         runId: row.id,
@@ -423,7 +440,10 @@ export function createDeliveryRouter(deps: {
       });
       return { kind: "failed", binding, inboxId: row.id, message };
     } finally {
-      if (inline.get(binding.id) === extras) inline.delete(binding.id);
+      if (inline.get(binding.id) === extras) {
+        inline.delete(binding.id);
+        inlineThreads.delete(binding.id);
+      }
       release();
       if (running.get(binding.id) === turn) running.delete(binding.id);
     }
@@ -698,6 +718,7 @@ export function createDeliveryRouter(deps: {
     converse,
     notify,
     awaitReply,
+    noteHandoff,
     smsOptOut,
     async receiveNative(
       scope: DeliveryScope,

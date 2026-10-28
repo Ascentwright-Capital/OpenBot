@@ -58,6 +58,11 @@ import {
 import { createApp } from "./app";
 import { createApprovedActionExecutor } from "./approvals/execute";
 import {
+  approvalFollowUpInstruction,
+  approvalOutcomeNotice,
+  queryEnded,
+} from "./approvals/query-ended";
+import {
   PERSON_QUESTION_WAITING,
   resumePersonQuestion,
 } from "./approvals/question-resume";
@@ -71,11 +76,6 @@ import {
   type ApprovalResumeDependencies,
   createApprovalService,
 } from "./approvals/service";
-import {
-  approvalFollowUpInstruction,
-  approvalOutcomeNotice,
-  queryEnded,
-} from "./approvals/query-ended";
 import { createApprovalStore } from "./approvals/store";
 import {
   ApprovalRefusedError,
@@ -506,6 +506,7 @@ let deliveryNotifications: (
 ) => Promise<void> = async () => {
   throw new Error("Delivery is not initialized.");
 };
+let deliveryHandoffs: (threadId: string) => void = () => {};
 const authoriseQuestion = async (question: PersonQuestion) => {
   const source = await sourceForCoordinationRun({
     ...question,
@@ -1415,7 +1416,15 @@ const channelSourceForRun = async (run: RunAssertion) => {
 };
 const personQuestions = createWorkQueue(database);
 const coordination = createCoordinationTools({
-  desk: handoffDesk,
+  desk: {
+    // A hand-off made during a paired chat turn keeps that turn open for the answer.
+    send: async (input) => {
+      const outcome = await handoffDesk.send(input);
+      if (outcome.ok && input.from.threadId)
+        deliveryHandoffs(input.from.threadId);
+      return outcome;
+    },
+  },
   caps: config.handoff,
   approvalGate: approvalService.gate,
   privateShare: {
@@ -2322,6 +2331,7 @@ const deliveryRouter = createDeliveryRouter({
     }),
 });
 deliveryNotifications = (scope, input) => deliveryRouter.notify(scope, input);
+deliveryHandoffs = (threadId) => deliveryRouter.noteHandoff(threadId);
 
 /*
  * Proactive research: an opted-in Bot reading its owner's apps in the background, restricted to
@@ -2738,6 +2748,25 @@ if (config.handoff.maxDepth > 0 && config.handoff.maxPerRun > 0) {
           text: input.text,
           agentId: input.agentId,
           at: new Date(),
+        });
+        // And to Slack, SMS or the phone, like any other reply the person did not wait in OpenBot for.
+        await deliveryNotifications(
+          {
+            ownerUserId: input.actorId,
+            channelId: mapped.channelId,
+            agentId: input.agentId,
+            threadId: input.threadId,
+          },
+          {
+            id: `handoff-reply:${createHash("sha256")
+              .update(JSON.stringify([input.threadId, input.text]))
+              .digest("hex")
+              .slice(0, 32)}`,
+            text: input.text,
+            kind: "reply",
+          },
+        ).catch(() => {
+          // A conversation nobody reaches outside OpenBot refuses delivery; the answer is on record.
         });
       },
       // The asking conversation shown as working while a hop runs in it. Keyed by thread, resolved
