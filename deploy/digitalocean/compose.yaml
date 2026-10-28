@@ -18,8 +18,8 @@ services:
   # (OPENTAG_ANSWER_IN_CHANNELS, AP-92). Pinned to a commit; the first build takes several minutes.
   openbot:
     build:
-      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-4e1579b58de7c9228ed3a419b67f890ad6a8e1d3}
-    image: digital-factory/openbot:${OPENBOT_REF:-4e1579b58de7c9228ed3a419b67f890ad6a8e1d3}
+      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-fdd0f89}
+    image: digital-factory/openbot:${OPENBOT_REF:-fdd0f89}
     restart: unless-stopped
     env_file: .env
     environment:
