@@ -71,7 +71,7 @@ function fixture(
             binding: bound,
             inboxId: "in1",
             replyText: "Hello from your Bot.",
-            extras: { approvals: [], questions: [] },
+            extras: { approvals: [], questions: [], handoffs: 0 },
           }
         );
       },
@@ -450,7 +450,7 @@ test("bound sender runs the canonical turn and an approval becomes an OpenTag ca
       binding: bound,
       inboxId: "in1",
       replyText: "",
-      extras: { approvals: [APPROVAL], questions: [] },
+      extras: { approvals: [APPROVAL], questions: [], handoffs: 0 },
     },
   });
   const result = await run(f, {
@@ -496,6 +496,7 @@ test("in a conversation others may read, the answer goes to the owner privately"
       extras: {
         approvals: [APPROVAL],
         questions: [{ id: "q1", text: "Research Bot asks: which quarter?" }],
+        handoffs: 0,
       },
     },
   });
@@ -535,6 +536,7 @@ test("with OPENTAG_ANSWER_IN_CHANNELS, a shared thread gets the answer and the a
       extras: {
         approvals: [APPROVAL],
         questions: [{ id: "q1", text: "Research Bot asks: which quarter?" }],
+        handoffs: 0,
       },
     },
   });
@@ -666,6 +668,52 @@ test("an approved card carries the Bot's answer into its own thread", async () =
   expect(text).not.toContain("will send you its result");
   expect(f.calls).toContainEqual({ awaitReply: expect.any(String) });
 });
+test("a turn that handed work to another Bot carries its answer into the same thread", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    cardReply: "Software factory found 3 repos.",
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "I've asked Software factory.",
+      extras: { approvals: [], questions: [], handoffs: 1 },
+    },
+  });
+  const result = await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> check github" }],
+  });
+  expect(said(result.events)).toBe(
+    "I've asked Software factory.Software factory found 3 repos.",
+  );
+  expect(f.calls).toContainEqual({ awaitReply: bound.id });
+});
+test("a hand-off answer that is late says it will come directly", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "I've asked Software factory.",
+      extras: { approvals: [], questions: [], handoffs: 1 },
+    },
+  });
+  const result = await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> check github" }],
+  });
+  expect(said(result.events)).toContain("send you the answer directly");
+});
+test("a turn without a hand-off does not wait", async () => {
+  const f = fixture({ answerInChannels: true });
+  await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> hi" }],
+  });
+  expect(f.calls.some((c) => "awaitReply" in (c as object))).toBe(false);
+});
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();
   const signedRequest = (params: URLSearchParams) => {
@@ -771,7 +819,7 @@ test("a chart the Bot drew is drawn natively by the Channel, and its follow-up r
         },
         { name: "showRecord", args: { title: "Not a chart", fields: [] } },
       ],
-      extras: { approvals: [], questions: [] },
+      extras: { approvals: [], questions: [], handoffs: 0 },
     },
   });
   const offered = [{ name: "render_chart", description: "", parameters: {} }];
