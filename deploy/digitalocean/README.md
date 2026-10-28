@@ -133,8 +133,11 @@ fast-forwards `/opt/digital-factory` and runs `docker compose --env-file .env --
 coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
 
 - Pull, not push: GitHub holds no key to the droplet, and nothing new is opened to the internet.
-- A failed build leaves the running containers as they were and is retried every run until it
-  deploys or `main` moves on. Read `/var/log/digital-factory-deploy.log`.
+- The coworkers (`tenant/`) and the Caddyfile are mounted rather than built, so when a merge
+  changes them it restarts `openbot` or reloads Caddy.
+- A failed build leaves the running containers as they were and is tried again, at most three
+  times per commit, so a broken build does not keep the droplet's CPU busy. The next merge tries
+  again, or delete `~/.digital-factory-failed`. Read `/var/log/digital-factory-deploy.log`.
 - Only fast-forwards. Local commits on the droplet stop it, and the log says so.
 - `.env` is never touched. A change that needs a new setting still needs it added by hand first.
 - To pause it, comment out the `autodeploy.sh` line in `/etc/cron.d/digital-factory`.
