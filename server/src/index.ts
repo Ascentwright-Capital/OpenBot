@@ -141,7 +141,7 @@ import {
   configuredDeliveryProviders,
   type DeliveryScopeResolver,
 } from "./delivery/routes";
-import { createDeliveryStore } from "./delivery/store";
+import { createDeliveryStore, threadBindingIdentity } from "./delivery/store";
 import type { DeliveryScope } from "./delivery/types";
 import { DeliveryRefusedError } from "./delivery/types";
 import { createDemonstrationRecorder } from "./demonstrations/recording";
@@ -1984,6 +1984,39 @@ const deliveryRouter = createDeliveryRouter({
   owner: workOwner("delivery"),
   providers: deliveryProviders,
   authoriseScope: authoriseDeliveryScope,
+  /*
+   * A shared Slack thread's own conversation with the Bot, so one thread never reads another. Made
+   * on the thread's first message, named after it, and kept as a second binding of the same person.
+   */
+  threadBinding: async (person, thread) => {
+    const identity = threadBindingIdentity(person.identity, thread.key);
+    const found = await deliveryStore.findBinding(
+      person.transport,
+      person.realm,
+      identity,
+    );
+    if (found && (await authoriseDeliveryScope(found))) return found;
+    const actor = await actorFor(person.ownerUserId);
+    const channel = await channelStore.create(actor, [person.agentId]);
+    const title = thread.title.replace(/\s+/g, " ").trim();
+    await database
+      .update(channels)
+      .set({
+        name: `Slack: ${title.length > 60 ? `${title.slice(0, 59)}…` : title}`,
+      })
+      .where(eq(channels.id, channel.id));
+    return deliveryStore.bind({
+      ownerUserId: person.ownerUserId,
+      channelId: channel.id,
+      agentId: person.agentId,
+      threadId: channel.threadId,
+      transport: person.transport,
+      realm: person.realm,
+      identity,
+      address: person.address,
+      mentionId: person.mentionId,
+    });
+  },
   notifyEvent: (event) => responsibilityEngine.ingest(event),
   runTurn: async (input) => {
     if (!(await authoriseDeliveryScope(input)))
