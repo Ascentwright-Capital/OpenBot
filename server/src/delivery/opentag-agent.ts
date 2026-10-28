@@ -75,7 +75,7 @@ export type PairedApprovals = {
 
 export type OpenTagAgentDeps = {
   opentag: OpenTagTransport;
-  router: Pick<DeliveryRouter, "converse" | "notify">;
+  router: Pick<DeliveryRouter, "converse" | "notify" | "awaitReply">;
   store: Pick<
     DeliveryStore,
     | "findBinding"
@@ -253,7 +253,7 @@ async function answer(
   // The Channel drew our chart and runs us again with its result; the turn already answered.
   if (isComponentFollowUp(input)) return { text: "" };
   const resume = resumeFromInput(input);
-  if (resume) return decideFromCard(deps, resume);
+  if (resume) return decideFromCard(deps, resume, signal);
 
   const sender = senderFromContext(input);
   if (!sender)
@@ -527,9 +527,13 @@ async function approvalCard(
   });
 }
 
+/** How long an approval card's turn waits to carry the Bot's answer into its thread. */
+const CARD_REPLY_WAIT_MS = 90_000;
+
 async function decideFromCard(
   deps: OpenTagAgentDeps,
   resume: NonNullable<ReturnType<typeof resumeFromInput>>,
+  signal?: AbortSignal,
 ): Promise<{ text: string }> {
   if (resume.invalid)
     return {
@@ -575,14 +579,25 @@ async function decideFromCard(
     : resume.always
       ? "allow_always"
       : "allow_once";
+  // Listening before deciding: the resume can answer within the sweep's next tick.
+  const reply = deps.router.awaitReply(binding.id, CARD_REPLY_WAIT_MS, signal);
   await deps.approvals.decide(binding.ownerUserId, resume.approvalId, decision);
   const bot = await deps.store.botIdentity(record.action.botId);
   const name = bot?.name ?? "Your Bot";
+  const decided =
+    decision === "deny"
+      ? `Denied. ${name} will not run ${record.action.toolRef}.`
+      : decision === "allow_always"
+        ? "Always allowed."
+        : "Allowed once.";
+  // The Bot's answer, here in the card's thread. Without one in time it arrives by direct message.
+  const text = await reply;
+  if (text) return { text: `${decided}\n\n${text}` };
   return {
     text:
       decision === "deny"
-        ? `Denied. ${name} will not run ${record.action.toolRef}.`
-        : `${decision === "allow_always" ? "Always allowed" : "Allowed once"}. ${name} is continuing and will send its result here.`,
+        ? decided
+        : `${decided} ${name} is continuing and will send you its result.`,
   };
 }
 
