@@ -7,18 +7,19 @@
  * runs.
  */
 import { randomUUID } from "node:crypto";
+import type { DrawnComponent } from "@openbot/toolkit/run-turn";
 import { z } from "zod";
 import { type ApprovalDecision, approvalPreview } from "../approvals/types";
 import {
   ingestSlackEvent,
   type SlackTriggerEvent,
 } from "../responsibilities/slack";
-import type { DrawnComponent } from "@openbot/toolkit/run-turn";
 import {
   agUiStream,
   approvalFields,
   COMPONENT_CALL_PREFIX,
   chartForOpenTag,
+  chartSourcesLine,
   componentCallEvents,
   confirmWriteInterrupt,
   isComponentFollowUp,
@@ -213,6 +214,7 @@ export async function handleOpenTagRun(
             args,
           ))
             emit(event);
+          say(chartSourcesLine(component.args));
         }
       if (outcome.interrupt)
         emit({
