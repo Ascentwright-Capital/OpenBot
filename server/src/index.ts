@@ -71,7 +71,11 @@ import {
   type ApprovalResumeDependencies,
   createApprovalService,
 } from "./approvals/service";
-import { approvalOutcomeNotice, queryEnded } from "./approvals/query-ended";
+import {
+  approvalFollowUpInstruction,
+  approvalOutcomeNotice,
+  queryEnded,
+} from "./approvals/query-ended";
 import { createApprovalStore } from "./approvals/store";
 import {
   ApprovalRefusedError,
@@ -2092,15 +2096,26 @@ const approvalSweep = repeatAfterEach(async () => {
                * The Claude query that asked ended before the answer came (its time limit, or a
                * restart), so nothing can take the result. The action has run or been refused
                * either way; retrying only failed again until the work item died, and the request
-               * never finished. The person is told the outcome instead.
+               * never finished. A new turn asks the Bot to tell the person the outcome, and a
+               * plain notice stands in if that turn fails too.
                */
               if (!queryEnded(error)) throw error;
-              return {
+              return approvalContinuationRunner({
+                ownerUserId: input.ownerUserId,
+                routineId: "approval",
+                agentId: request.action.botId,
+                threadId: snapshot.threadId,
+                instruction: approvalFollowUpInstruction(
+                  request.action.toolRef,
+                  result,
+                ),
+                initiator: snapshot.initiator ?? PERSON_INITIATOR,
+              }).catch(() => ({
                 replyText: approvalOutcomeNotice(
                   request.action.toolRef,
                   result,
                 ),
-              };
+              }));
             });
           const [source] = await database
             .select({ channelId: intelligenceChannelMappings.channelId })

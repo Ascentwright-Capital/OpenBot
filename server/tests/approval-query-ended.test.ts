@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  approvalFollowUpInstruction,
   approvalOutcomeNotice,
   QUERY_ENDED_ERROR,
   queryEnded,
@@ -35,5 +36,17 @@ describe("approval answered after its query ended", () => {
     expect(
       approvalOutcomeNotice("x/y", { content: "boom", error: "boom" }),
     ).toMatch(/^Not done: x\/y\. boom /);
+  });
+
+  it("asks the Bot for the outcome with the result fenced as data", () => {
+    const ran = approvalFollowUpInstruction("x/y", { content: "id: 42" });
+    expect(ran).toContain("<result>\nid: 42\n</result>");
+    expect(ran).toContain("Do not repeat the action.");
+    const refused = approvalFollowUpInstruction("x/y", {
+      content: "no",
+      error: "Declined",
+    });
+    expect(refused).toContain("It was not done: Declined");
+    expect(refused).not.toContain("<result>");
   });
 });
