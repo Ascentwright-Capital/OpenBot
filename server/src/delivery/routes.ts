@@ -263,7 +263,10 @@ export function createDeliveryRoutes(deps: {
   return routes;
 }
 export function createDeliveryWebhookRoutes(deps: {
-  router: Pick<DeliveryRouter, "receive" | "converse" | "notify" | "smsOptOut">;
+  router: Pick<
+    DeliveryRouter,
+    "receive" | "converse" | "notify" | "smsOptOut" | "awaitReply"
+  >;
   store: Pick<
     DeliveryStore,
     | "readChallenge"

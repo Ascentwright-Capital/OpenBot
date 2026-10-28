@@ -367,8 +367,14 @@ test("a second paired message waits for the first turn instead of colliding with
       "I'm still working on your previous message. Send this one again once I've answered.",
   });
   open();
-  expect(await first).toMatchObject({ kind: "replied", replyText: "re: first" });
-  expect(await second).toMatchObject({ kind: "replied", replyText: "re: second" });
+  expect(await first).toMatchObject({
+    kind: "replied",
+    replyText: "re: first",
+  });
+  expect(await second).toMatchObject({
+    kind: "replied",
+    replyText: "re: second",
+  });
   expect(started).toEqual(["first", "second"]);
 });
 test("chat sends carry the Bot's identity; SMS after STOP is recorded opted out, not sent", async () => {
@@ -466,4 +472,18 @@ test("the person's update routing decides which transports carry each kind", asy
       return `${r.kind}:${r.transport}`;
     }),
   ).toEqual(["reply:push", "question:slack"]);
+});
+test("a reply awaited by an approval card's turn goes there, not to the outbox", async () => {
+  const f = fixture();
+  const waiting = f.router.awaitReply(binding.id, 5_000);
+  await f.router.notify(scope, { id: "r1", text: "Posted.", kind: "reply" });
+  expect(await waiting).toBe("Posted.");
+  expect(f.offered).toEqual([]);
+  // Only the next reply: the one after it goes out as usual.
+  await f.router.notify(scope, { id: "r2", text: "Later.", kind: "reply" });
+  expect(f.offered).toHaveLength(1);
+  // Unanswered in time, the card's turn moves on and nothing is held back.
+  expect(await f.router.awaitReply(binding.id, 5)).toBeNull();
+  await f.router.notify(scope, { id: "r3", text: "Late.", kind: "reply" });
+  expect(f.offered).toHaveLength(2);
 });
