@@ -33,6 +33,7 @@ function fixture(
     bound?: boolean;
     identity?: IdentityAdapter;
     answerInChannels?: boolean;
+    cardReply?: string;
   } = {},
 ) {
   const calls: unknown[] = [];
@@ -57,6 +58,10 @@ function fixture(
       smsOptOut: async (...input) => {
         calls.push({ optOut: input });
         return 1;
+      },
+      awaitReply: async (bindingId) => {
+        calls.push({ awaitReply: bindingId });
+        return options.cardReply ?? null;
       },
       converse: async (input) => {
         calls.push({ converse: input });
@@ -637,6 +642,29 @@ test("card resume decides through the approvals service as the binding owner onl
   expect(f.decisions).toHaveLength(1);
   await resume({ confirmed: false, by: "slack:T1:U1" });
   expect(f.decisions[1]).toEqual(["owner", APPROVAL, "deny"]);
+});
+test("an approved card carries the Bot's answer into its own thread", async () => {
+  const f = fixture({ cardReply: "Posted the comment on AP-89." });
+  const text = said(
+    (
+      await run(f, {
+        forwardedProps: {
+          command: {
+            resume: {
+              "0f8fad5bd9cb469fa16570867728950e": {
+                confirmed: true,
+                by: "slack:T1:U1",
+              },
+            },
+          },
+        },
+      })
+    ).events,
+  );
+  expect(text).toContain("Allowed once.");
+  expect(text).toContain("Posted the comment on AP-89.");
+  expect(text).not.toContain("will send you its result");
+  expect(f.calls).toContainEqual({ awaitReply: expect.any(String) });
 });
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();

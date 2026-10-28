@@ -162,6 +162,36 @@ export function createDeliveryRouter(deps: {
   const inline = new Map<string, InlineTurnExtras>();
   /** The paired chat turn running (or queued) last on each binding in this process. */
   const running = new Map<string, Promise<void>>();
+  /**
+   * Bindings whose person just answered an approval card and is still in that card's turn. The
+   * Bot's next reply is handed to that turn, so it lands in the thread the person asked in, instead
+   * of going out as a separate direct message.
+   */
+  const awaiting = new Map<string, (text: string) => void>();
+  /**
+   * Wait for the Bot's next reply on one binding, for up to `ms`. Resolves `null` on timeout or
+   * abort, and the reply then goes out the usual way.
+   */
+  function awaitReply(
+    bindingId: string,
+    ms: number,
+    signal?: AbortSignal,
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      const done = (text: string | null) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", stop);
+        if (awaiting.get(bindingId) === take) awaiting.delete(bindingId);
+        resolve(text);
+      };
+      const take = (text: string) => done(text);
+      const stop = () => done(null);
+      const timer = setTimeout(stop, ms);
+      signal?.addEventListener("abort", stop, { once: true });
+      awaiting.set(bindingId, take);
+      if (signal?.aborted) stop();
+    });
+  }
   async function notify(
     scope: DeliveryScope,
     input: {
@@ -182,6 +212,11 @@ export function createDeliveryRouter(deps: {
     });
     if (includeBindings)
       for (const binding of await deps.store.bindingsFor(scope)) {
+        const take = input.kind === "reply" && awaiting.get(binding.id);
+        if (take) {
+          take(input.text);
+          continue;
+        }
         const open = inline.get(binding.id);
         if (open && input.kind === "approval" && input.requestId) {
           open.approvals.push(input.requestId);
@@ -309,7 +344,10 @@ export function createDeliveryRouter(deps: {
     const turn = (previous ?? Promise.resolve()).then(() => mine);
     running.set(binding.id, turn);
     try {
-      if (previous && !(await settledWithin(previous, BUSY_WAIT_MS, input.signal)))
+      if (
+        previous &&
+        !(await settledWithin(previous, BUSY_WAIT_MS, input.signal))
+      )
         throw new DeliveryRefusedError(
           "I'm still working on your previous message. Send this one again once I've answered.",
         );
@@ -374,7 +412,8 @@ export function createDeliveryRouter(deps: {
         error instanceof DeliveryRefusedError
           ? error.message
           : "The agent turn failed. Inspect the conversation before retrying.";
-      if (!(error instanceof DeliveryRefusedError)) logTurnFailure(row.id, error);
+      if (!(error instanceof DeliveryRefusedError))
+        logTurnFailure(row.id, error);
       await deps.store.setInbox(row.id, "failed", message);
       await deps.audit?.({
         ...scope,
@@ -465,7 +504,8 @@ export function createDeliveryRouter(deps: {
         });
       } catch (error) {
         if (!(await owns())) return;
-        if (!(error instanceof DeliveryRefusedError)) logTurnFailure(row.id, error);
+        if (!(error instanceof DeliveryRefusedError))
+          logTurnFailure(row.id, error);
         await deps.store.setInbox(
           row.id,
           "failed",
@@ -657,6 +697,7 @@ export function createDeliveryRouter(deps: {
     receive,
     converse,
     notify,
+    awaitReply,
     smsOptOut,
     async receiveNative(
       scope: DeliveryScope,
