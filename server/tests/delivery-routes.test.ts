@@ -687,7 +687,7 @@ test("a turn that handed work to another Bot carries its answer into the same th
   expect(said(result.events)).toBe(
     "I've asked Software factory.Software factory found 3 repos.",
   );
-  expect(f.calls).toContainEqual({ awaitReply: bound.id });
+  expect(f.calls).toContainEqual({ awaitReply: bound.threadId });
 });
 test("a hand-off answer that is late says it will come directly", async () => {
   const f = fixture({
@@ -713,6 +713,27 @@ test("a turn without a hand-off does not wait", async () => {
     messages: [{ id: "m1", role: "user", content: "<@UBOT> hi" }],
   });
   expect(f.calls.some((c) => "awaitReply" in (c as object))).toBe(false);
+});
+test("a shared thread asks for its own conversation; a direct message does not", async () => {
+  const f = fixture({ answerInChannels: true });
+  await run(f, {
+    threadId: "slack-thread-1",
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> plan the week" }],
+  });
+  await run(f, {
+    threadId: "dm-thread",
+    context: [sender("slack:T1:U1", { id: "D0123456789", kind: "im" })],
+    messages: [{ id: "m2", role: "user", content: "hi" }],
+  });
+  const conversed = f.calls
+    .map((c) => (c as { converse?: { thread?: unknown } }).converse)
+    .filter(Boolean);
+  expect(conversed[0]?.thread).toEqual({
+    key: "slack-thread-1",
+    title: "plan the week",
+  });
+  expect(conversed[1]?.thread).toBeUndefined();
 });
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();

@@ -119,6 +119,14 @@ export function createDeliveryRouter(deps: {
   queue: Pick<WorkQueue, "claim" | "renew" | "finish" | "release">;
   owner: string;
   authoriseScope(scope: DeliveryScope): Promise<boolean>;
+  /**
+   * The conversation a chat thread has of its own, made on its first message: the person's binding,
+   * moved to that thread's own OpenBot conversation. Absent, every thread shares the binding's one.
+   */
+  threadBinding?(
+    binding: DeliveryBinding,
+    thread: { key: string; title: string },
+  ): Promise<DeliveryBinding>;
   runTurn(
     input: DeliveryScope & { runId: string; text: string; signal: AbortSignal },
   ): Promise<{
@@ -157,27 +165,25 @@ export function createDeliveryRouter(deps: {
 }) {
   const leaseMs = 60_000;
   /**
-   * Bindings with a paired chat turn open in this process. An approval or question raised during
+   * Conversations with a paired chat turn open in this process, by thread. An approval or question raised during
    * that turn is shown in the turn itself (an OpenTag card, or text), so it is collected here rather
    * than also sent as a second, proactive message to the same person.
    */
   const inline = new Map<string, InlineTurnExtras>();
-  /** The conversation each open paired turn runs in, so a hand-off can be tied back to it. */
-  const inlineThreads = new Map<string, string>();
-  /** The paired chat turn running (or queued) last on each binding in this process. */
+  /** The paired chat turn running (or queued) last in each conversation in this process. */
   const running = new Map<string, Promise<void>>();
   /**
-   * Bindings whose person just answered an approval card and is still in that card's turn. The
+   * Conversations whose person just answered an approval card and is still in that card's turn. The
    * Bot's next reply is handed to that turn, so it lands in the thread the person asked in, instead
    * of going out as a separate direct message.
    */
   const awaiting = new Map<string, (text: string) => void>();
   /**
-   * Wait for the Bot's next reply on one binding, for up to `ms`. Resolves `null` on timeout or
+   * Wait for the Bot's next reply in one conversation (its thread id), for up to `ms`. Resolves `null` on timeout or
    * abort, and the reply then goes out the usual way.
    */
   function awaitReply(
-    bindingId: string,
+    threadId: string,
     ms: number,
     signal?: AbortSignal,
   ): Promise<string | null> {
@@ -185,24 +191,21 @@ export function createDeliveryRouter(deps: {
       const done = (text: string | null) => {
         clearTimeout(timer);
         signal?.removeEventListener("abort", stop);
-        if (awaiting.get(bindingId) === take) awaiting.delete(bindingId);
+        if (awaiting.get(threadId) === take) awaiting.delete(threadId);
         resolve(text);
       };
       const take = (text: string) => done(text);
       const stop = () => done(null);
       const timer = setTimeout(stop, ms);
       signal?.addEventListener("abort", stop, { once: true });
-      awaiting.set(bindingId, take);
+      awaiting.set(threadId, take);
       if (signal?.aborted) stop();
     });
   }
   /** A Bot handed work on from `threadId`; the paired turn open there, if any, is told. */
   function noteHandoff(threadId: string) {
-    for (const [bindingId, thread] of inlineThreads)
-      if (thread === threadId) {
-        const open = inline.get(bindingId);
-        if (open) open.handoffs += 1;
-      }
+    const open = inline.get(threadId);
+    if (open) open.handoffs += 1;
   }
   async function notify(
     scope: DeliveryScope,
@@ -224,12 +227,12 @@ export function createDeliveryRouter(deps: {
     });
     if (includeBindings)
       for (const binding of await deps.store.bindingsFor(scope)) {
-        const take = input.kind === "reply" && awaiting.get(binding.id);
+        const take = input.kind === "reply" && awaiting.get(binding.threadId);
         if (take) {
           take(input.text);
           continue;
         }
-        const open = inline.get(binding.id);
+        const open = inline.get(binding.threadId);
         if (open && input.kind === "approval" && input.requestId) {
           open.approvals.push(input.requestId);
           continue;
@@ -322,13 +325,21 @@ export function createDeliveryRouter(deps: {
     externalId: string;
     text: string;
     signal: AbortSignal;
+    /** The chat thread this message is in, when it should have a conversation of its own. */
+    thread?: { key: string; title: string };
   }): Promise<ConverseResult> {
-    const binding = await deps.store.findBinding(
+    const person = await deps.store.findBinding(
       input.transport,
       input.realm,
       input.identity,
     );
-    if (!binding || !(await deps.authoriseScope(binding)))
+    if (!person || !(await deps.authoriseScope(person)))
+      return { kind: "unbound" };
+    const binding =
+      input.thread && deps.threadBinding
+        ? await deps.threadBinding(person, input.thread)
+        : person;
+    if (binding !== person && !(await deps.authoriseScope(binding)))
       return { kind: "unbound" };
     const scope = {
       ownerUserId: binding.ownerUserId,
@@ -352,13 +363,13 @@ export function createDeliveryRouter(deps: {
       questions: [],
       handoffs: 0,
     };
-    // One turn per binding at a time: a second message while the first is still running would
+    // One turn per conversation at a time: a second message while the first is still running would
     // fail on the Intelligence thread lock, so it waits for the first instead.
-    const previous = running.get(binding.id);
+    const previous = running.get(binding.threadId);
     let release!: () => void;
     const mine = new Promise<void>((resolve) => (release = resolve));
     const turn = (previous ?? Promise.resolve()).then(() => mine);
-    running.set(binding.id, turn);
+    running.set(binding.threadId, turn);
     try {
       if (
         previous &&
@@ -367,8 +378,7 @@ export function createDeliveryRouter(deps: {
         throw new DeliveryRefusedError(
           "I'm still working on your previous message. Send this one again once I've answered.",
         );
-      inline.set(binding.id, extras);
-      inlineThreads.set(binding.id, binding.threadId);
+      inline.set(binding.threadId, extras);
       const result = await deps.runTurn({
         ...scope,
         runId: row.id,
@@ -440,12 +450,11 @@ export function createDeliveryRouter(deps: {
       });
       return { kind: "failed", binding, inboxId: row.id, message };
     } finally {
-      if (inline.get(binding.id) === extras) {
-        inline.delete(binding.id);
-        inlineThreads.delete(binding.id);
-      }
+      if (inline.get(binding.threadId) === extras)
+        inline.delete(binding.threadId);
       release();
-      if (running.get(binding.id) === turn) running.delete(binding.id);
+      if (running.get(binding.threadId) === turn)
+        running.delete(binding.threadId);
     }
   }
   async function deliver(

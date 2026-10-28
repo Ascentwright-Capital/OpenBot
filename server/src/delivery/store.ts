@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, notLike, or, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { agents } from "../db/schema/core";
 import { agentProfiles } from "../db/schema/coworker";
@@ -21,6 +21,18 @@ import {
   type DeliveryState,
   type PushDevice,
 } from "./types";
+/**
+ * A chat thread's own conversation is kept as a second binding of the same person, its identity
+ * suffixed with the thread. A row rather than a table, because a new migration on this release
+ * branch would be skipped by the next upstream release's migrator. Never listed or found as the
+ * person themselves: `findBinding` matches the exact identity, and Slack and Teams ids have no `#`.
+ */
+export const THREAD_SEPARATOR = "#";
+export const threadBindingIdentity = (identity: string, thread: string) =>
+  `${identity}${THREAD_SEPARATOR}${thread}`;
+/** The person a binding speaks for, whether it is theirs or one of their threads'. */
+export const personIdentity = (identity: string) =>
+  identity.split(THREAD_SEPARATOR, 1)[0] ?? identity;
 export function createDeliveryStore(database: Database) {
   async function enqueue(
     db: Pick<Database, "insert" | "execute">,
@@ -39,7 +51,12 @@ export function createDeliveryStore(database: Database) {
       return database
         .select()
         .from(deliveryBindings)
-        .where(eq(deliveryBindings.ownerUserId, owner));
+        .where(
+          and(
+            eq(deliveryBindings.ownerUserId, owner),
+            notLike(deliveryBindings.identity, `%${THREAD_SEPARATOR}%`),
+          ),
+        );
     },
     async binding(id: string) {
       return (
@@ -152,6 +169,23 @@ export function createDeliveryStore(database: Database) {
         .returning();
       if (!rows.length)
         throw new DeliveryNotFoundError("Connection not found.");
+      // Its threads' conversations go with it.
+      for (const row of rows)
+        if (!row.identity.includes(THREAD_SEPARATOR))
+          await database
+            .update(deliveryBindings)
+            .set({ enabled: false })
+            .where(
+              and(
+                eq(deliveryBindings.ownerUserId, owner),
+                eq(deliveryBindings.transport, row.transport),
+                eq(deliveryBindings.realm, row.realm),
+                like(
+                  deliveryBindings.identity,
+                  `${row.identity}${THREAD_SEPARATOR}%`,
+                ),
+              ),
+            );
     },
     async challenge(
       scope: DeliveryScope,
