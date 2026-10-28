@@ -487,3 +487,18 @@ test("a reply awaited by an approval card's turn goes there, not to the outbox",
   await f.router.notify(scope, { id: "r3", text: "Late.", kind: "reply" });
   expect(f.offered).toHaveLength(2);
 });
+test("a hand-off made during a paired chat turn is counted on that turn only", async () => {
+  const f = fixture({}, async (router) => {
+    router.noteHandoff(scope.threadId);
+    router.noteHandoff("some-other-thread");
+  });
+  const result = await f.router.converse({
+    transport: "slack",
+    realm: "T",
+    identity: "U",
+    externalId: "handoff-1",
+    text: "Ask Software factory",
+    signal: new AbortController().signal,
+  });
+  expect(result).toMatchObject({ extras: { handoffs: 1 } });
+});

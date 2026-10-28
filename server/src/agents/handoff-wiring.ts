@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { IntelligenceAgentRunner } from "@copilotkit/runtime/v2";
 import { workOwner } from "@openbot/shared/work-owner";
 import { eq } from "drizzle-orm";
@@ -10,6 +10,7 @@ import type { DeploymentConfig } from "../config";
 import type { mountCopilotRuntime } from "../copilot";
 import type { Database } from "../db/client";
 import { intelligenceChannelMappings } from "../db/schema";
+import type { DeliveryScope } from "../delivery/types";
 import { repeatAfterEach } from "../work/loop";
 import {
   createWorkQueue,
@@ -39,6 +40,11 @@ export async function startHandoffDelivery(deps: {
   threadIdentity: ThreadIdentity;
   groupConversations: GroupConversations;
   channelStore: ChannelStore;
+  /** The delivery router's `notify`, so a relayed answer reaches Slack, SMS or the phone too. */
+  notify: (
+    scope: DeliveryScope,
+    input: { id: string; text: string; kind: "reply" },
+  ) => Promise<void>;
 }): Promise<WorkOfferedListener> {
   const {
     config,
@@ -49,6 +55,7 @@ export async function startHandoffDelivery(deps: {
     threadIdentity,
     groupConversations,
     channelStore,
+    notify,
   } = deps;
   const runner = createHandoffRunner({
     queue: createWorkQueue(database),
@@ -114,6 +121,25 @@ export async function startHandoffDelivery(deps: {
           text: input.text,
           agentId: input.agentId,
           at: new Date(),
+        });
+        // And to Slack, SMS or the phone, like any other reply the person did not wait in OpenBot for.
+        await notify(
+          {
+            ownerUserId: input.actorId,
+            channelId: mapped.channelId,
+            agentId: input.agentId,
+            threadId: input.threadId,
+          },
+          {
+            id: `handoff-reply:${createHash("sha256")
+              .update(JSON.stringify([input.threadId, input.text]))
+              .digest("hex")
+              .slice(0, 32)}`,
+            text: input.text,
+            kind: "reply",
+          },
+        ).catch(() => {
+          // A conversation nobody reaches outside OpenBot refuses delivery; the answer is on record.
         });
       },
       // The asking conversation shown as working while a hop runs in it. Keyed by thread, resolved

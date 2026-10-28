@@ -571,6 +571,7 @@ let deliveryNotifications: (
 ) => Promise<void> = async () => {
   throw new Error("Delivery is not initialized.");
 };
+let deliveryHandoffs: (threadId: string) => void = () => {};
 
 /**
  * Who a routine acts as, resolved the way {@link resolveRequestActor} resolves it.
@@ -1586,7 +1587,15 @@ const agentFetch = createAgentFetch({
   },
 });
 const { coordination, coordinationForActor } = wireCoordination({
-  handoffDesk,
+  handoffDesk: {
+    // A hand-off made during a paired chat turn keeps that turn open for the answer.
+    send: async (input) => {
+      const outcome = await handoffDesk.send(input);
+      if (outcome.ok && input.from.threadId)
+        deliveryHandoffs(input.from.threadId);
+      return outcome;
+    },
+  },
   config,
   approvalService,
   agentProfileStore,
@@ -2033,6 +2042,7 @@ const deliveryRouter = createDeliveryRouter({
     }),
 });
 deliveryNotifications = (scope, input) => deliveryRouter.notify(scope, input);
+deliveryHandoffs = (threadId) => deliveryRouter.noteHandoff(threadId);
 
 /*
  * Proactive research: an opted-in Bot reading its owner's apps in the background, restricted to
@@ -2248,6 +2258,7 @@ if (config.handoff.maxDepth > 0 && config.handoff.maxPerRun > 0) {
     threadIdentity,
     groupConversations,
     channelStore,
+    notify: (scope, input) => deliveryNotifications(scope, input),
   });
 }
 
