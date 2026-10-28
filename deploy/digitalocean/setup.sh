@@ -76,11 +76,14 @@ install -d -o "$USER_NAME" -g "$USER_NAME" "$DIR"
 cat > /etc/cron.d/digital-factory <<CRON
 * * * * * $USER_NAME $DIR/deploy/digitalocean/sweeps.sh routines >> /var/log/digital-factory-sweeps.log 2>&1
 17 * * * * $USER_NAME $DIR/deploy/digitalocean/sweeps.sh attachments >> /var/log/digital-factory-sweeps.log 2>&1
+*/2 * * * * $USER_NAME $DIR/deploy/digitalocean/autodeploy.sh >> /var/log/digital-factory-deploy.log 2>&1
 CRON
-touch /var/log/digital-factory-sweeps.log
-chown "$USER_NAME" /var/log/digital-factory-sweeps.log
+for log in sweeps deploy; do
+  touch "/var/log/digital-factory-$log.log"
+  chown "$USER_NAME" "/var/log/digital-factory-$log.log"
+done
 cat > /etc/logrotate.d/digital-factory <<'ROTATE'
-/var/log/digital-factory-sweeps.log {
+/var/log/digital-factory-sweeps.log /var/log/digital-factory-deploy.log {
   weekly
   rotate 4
   compress

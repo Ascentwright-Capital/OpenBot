@@ -9,6 +9,7 @@ sub-issues; the platform choice is D-67.
 | `compose.yaml` | The all-in-one OpenBot image with its own PostgreSQL, the Claude harness, and Caddy for TLS |
 | `setup.sh` | One-time hardening and Docker install for a fresh Ubuntu 24.04 droplet |
 | `sweeps.sh` | Fires due routines and culls unsent attachments; host cron runs it |
+| `autodeploy.sh` | Deploys `main` when it moves; host cron runs it every two minutes |
 | `Caddyfile` | HTTPS for `OPENBOT_DOMAIN`, certificates from Let's Encrypt |
 | `.env.example` | Every setting this deployment needs, with where each value comes from |
 | `opentag` service | Slack through CopilotKit OpenTag, started with `--profile slack` |
@@ -122,6 +123,28 @@ A role grants nothing. After the first start, an administrator grants on each co
 
 Link Slack to the Orchestrator's **Front desk** conversation (see "Slack", step 5) so the team talks
 to the front desk rather than to one person's private conversation.
+
+## Deploys
+
+A merge to `main` is live within a few minutes. Host cron runs [`autodeploy.sh`](autodeploy.sh)
+every two minutes: it fetches `origin/main`, and when that is not the commit it last deployed, it
+fast-forwards `/opt/digital-factory` and runs `docker compose --env-file .env --profile slack up -d
+--build --wait`. So a pull request that moves `OPENBOT_REF` or `OPENTAG_REF` in `compose.yaml`, edits a
+coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
+
+- Pull, not push: GitHub holds no key to the droplet, and nothing new is opened to the internet.
+- A failed build leaves the running containers as they were and is retried every run until it
+  deploys or `main` moves on. Read `/var/log/digital-factory-deploy.log`.
+- Only fast-forwards. Local commits on the droplet stop it, and the log says so.
+- `.env` is never touched. A change that needs a new setting still needs it added by hand first.
+- To pause it, comment out the `autodeploy.sh` line in `/etc/cron.d/digital-factory`.
+
+`setup.sh` installs the cron line. On a droplet set up before it existed, run as root:
+
+```sh
+echo '*/2 * * * * factory /opt/digital-factory/deploy/digitalocean/autodeploy.sh >> /var/log/digital-factory-deploy.log 2>&1' >> /etc/cron.d/digital-factory
+touch /var/log/digital-factory-deploy.log && chown factory /var/log/digital-factory-deploy.log
+```
 
 ## Update
 
