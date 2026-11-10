@@ -37,7 +37,7 @@
     "cron-parser": "^5",
     "drizzle-orm": "^0.45.2",
     "eventsource": "3.0.7",
-    "hono": "^4.10.0",
+    "hono": "^4.13.16",
     "http-message-sig": "0.3.0",
     "postgres": "^3.4.9",
     "rxjs": "7.8.1",
