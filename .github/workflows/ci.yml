@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun run format:check
       - run: bun run lint
@@ -85,7 +85,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       # Two installs, and the root one is load-bearing. Both packages set `types: ["bun"]` in
       # their tsconfig while `@types/bun` is a root devDependency, so tsc resolves it by walking up
       # to the root node_modules. Without it the typecheck fails with TS2688 on a fresh checkout.
@@ -128,7 +128,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
         working-directory: agent-computer
@@ -179,7 +179,7 @@ jobs:
       # For the coherence check below, which is a Bun script like everything else here.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       # Nothing rendered this chart until now, which is how four values files that produce a server
       # unable to start were shipped and stayed shipped. Rendering is the cheap half; the refusals in
       # validation.yaml are the half that catches a missing value before a cluster does.
@@ -338,7 +338,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       # The Bots are not root workspaces and each keeps its own lockfile. The startup tests spawn
       # the real entrypoint, so its dependencies have to be installed as well.
@@ -384,7 +384,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun test app/tests/build-cache.test.ts
 
@@ -400,7 +400,7 @@ jobs:
           python-version: "3.12"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - name: CrewAI provider-boundary regression
         run: |
           set -euo pipefail
@@ -500,7 +500,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun run build
 
@@ -519,7 +519,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       # Collisions and gaps between the migration files themselves.
       - run: bunx drizzle-kit check --config=drizzle.config.ts

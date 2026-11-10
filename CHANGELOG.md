@@ -43,6 +43,12 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
   `computers/<Bot id>` on the workspace volume (below). Files saved before the upgrade stay at the
   root of the volume, where no Bot sees them; move them into a Bot's folder to give them back.
 
+### Security updates
+
+- The images are built with Bun 1.4.4 and Node.js 24.22.2, which fix a remote code execution flaw in
+  the Brotli decoder (CVE-2026-111497). A deployment takes the fix by pulling or rebuilding its
+  images; a clone needs Bun 1.4.4.
+
 ### Each Bot on a shared computer has its own files
 
 A computer that serves many Bots kept one folder of files for all of them, so a note one Bot saved
