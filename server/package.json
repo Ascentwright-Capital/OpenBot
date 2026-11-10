@@ -25,7 +25,7 @@
     "@copilotkit/runtime": "1.77.0",
     "@mastra/client-js": "^1.43.0",
     "@mastra/core": "^1.64.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@openbot/shared": "workspace:*",
     "@openbot/toolkit": "workspace:*",
     "@opentelemetry/api-logs": "0.221.0",
