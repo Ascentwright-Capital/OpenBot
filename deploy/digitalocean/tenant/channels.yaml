@@ -1,37 +1,37 @@
-# One starting conversation per coworker. Everybody signed in may open each one.
+# One starting conversation per coworker on the web, named like its Slack channel.
 channels:
   - id: front-desk
-    name: 00 Factory Master
-    description: Ask the factory for anything. 00 Factory Master hands it to the right coworker.
+    name: 00-factory-master
+    description: "Start here: ask the factory anything. 00 Factory Master hands it to the right coworker."
     permitted_agents: [orchestrator]
     allowed_groups: [all]
-  - id: marketing
-    name: Marketing
-    description: Social posts, campaigns and copy for Nusa Auto.
-    permitted_agents: [marketing]
-    allowed_groups: [all]
-  - id: analytics
-    name: 00 Analytics
-    description: Questions answered with data, read-only.
-    permitted_agents: [analytics]
-    allowed_groups: [all]
-  - id: software-factory
-    name: 00 Software Factory
-    description: Code changes as pull requests, from a Linear issue.
-    permitted_agents: [software-factory]
-    allowed_groups: [all]
   - id: recruitment
-    name: 00 Recruitment
-    description: Job descriptions, CV screening, onboarding and reviews.
+    name: 00-recruitment
+    description: "Job descriptions, CV screening, onboarding and reviews."
     permitted_agents: [recruitment]
     allowed_groups: [all]
   - id: strategy-pitch
-    name: 00 Strategy & Pitch
-    description: Pitches, one-pagers and key messages; finding researchers and advisers.
+    name: 00-strategy-pitch
+    description: "Pitches, one-pagers, key messages, fundraising; finding researchers and advisers."
     permitted_agents: [strategy-pitch]
     allowed_groups: [all]
   - id: aw-memory
-    name: 00 AW Memory
-    description: Meeting notes in, decisions and action items out; ask what was decided.
+    name: 00-aw-memory
+    description: "Meeting notes in, decisions and action items out; ask what was decided."
     permitted_agents: [aw-memory]
+    allowed_groups: [all]
+  - id: software-factory
+    name: 00-digital-factory
+    description: "Code changes as pull requests from a Linear issue; requests for new or changed coworkers."
+    permitted_agents: [software-factory]
+    allowed_groups: [all]
+  - id: analytics
+    name: 00-analytics
+    description: "Questions answered with data, read-only."
+    permitted_agents: [analytics]
+    allowed_groups: [all]
+  - id: marketing
+    name: 02-nusa-auto-marketing
+    description: "Nusa Auto content, Google Maps and reviews, WhatsApp, Instagram/TikTok and local ads."
+    permitted_agents: [marketing]
     allowed_groups: [all]
