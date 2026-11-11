@@ -9,6 +9,26 @@ cd "$(dirname "$0")"
 exec 9>/tmp/digital-factory-autodeploy.lock
 flock -n 9 || exit 0
 
+# Watchdog (AP-124). OpenBot can stop answering without exiting, and `restart: unless-stopped`
+# only catches an exit: on 11 Nov the API answered 502 for 25 minutes until a deploy restarted
+# it. So every run first asks OpenBot's /health through Caddy's container (busybox wget). Two
+# failures in a row (about four minutes) save the last 300 log lines next to the deploy log and
+# restart openbot. A deploy in progress holds the lock above, so it never races this.
+unhealthy="$HOME/.digital-factory-unhealthy"
+if docker compose --env-file .env exec -T caddy wget -q -T 10 -O /dev/null http://openbot:3001/health >/dev/null 2>&1; then
+  rm -f "$unhealthy"
+else
+  misses=$(( $(cat "$unhealthy" 2>/dev/null || echo 0) + 1 ))
+  echo "$misses" > "$unhealthy"
+  if [ "$misses" -ge 2 ]; then
+    stamp=$(date -u +%Y%m%dT%H%M%SZ)
+    echo "$(date -u +%FT%TZ) watchdog: openbot failed /health ${misses} times, restarting (logs in ~/openbot-hang-$stamp.log)"
+    docker compose --env-file .env logs --tail 300 openbot > "$HOME/openbot-hang-$stamp.log" 2>&1 || true
+    docker compose --env-file .env restart openbot || true
+    rm -f "$unhealthy"
+  fi
+fi
+
 repo=$(git rev-parse --show-toplevel)
 state="$HOME/.digital-factory-deployed"
 failed="$HOME/.digital-factory-failed"

@@ -141,6 +141,10 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
 - Only fast-forwards. Local commits on the droplet stop it, and the log says so.
 - `.env` is never touched. A change that needs a new setting still needs it added by hand first.
 - To pause it, comment out the `autodeploy.sh` line in `/etc/cron.d/digital-factory`.
+- **Watchdog:** each run first checks OpenBot's `/health` (through the Caddy container). Two failures in
+  a row, about four minutes, save the last 300 log lines to `~/openbot-hang-<time>.log` and restart
+  `openbot`, because a hung OpenBot does not exit and so `restart: unless-stopped` never fires. The log
+  line `watchdog: openbot failed /health` in `/var/log/digital-factory-deploy.log` marks each restart.
 
 `setup.sh` installs the cron line. On a droplet set up before it existed, run as root:
 
