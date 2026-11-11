@@ -26,6 +26,15 @@ else
     docker compose --env-file .env logs --tail 300 openbot > "$HOME/openbot-hang-$stamp.log" 2>&1 || true
     docker compose --env-file .env restart openbot || true
     rm -f "$unhealthy"
+    # Say so in Slack #00-digital-factory through the Factory app, so nobody has to log in to notice.
+    # Only this notice is posted; the log lines stay on the droplet.
+    token=$(sed -n 's/^OPENTAG_SLACK_BOT_TOKEN=//p' .env | head -n 1 | tr -d '"')
+    if [ -n "$token" ]; then
+      curl -s -m 10 -X POST https://slack.com/api/chat.postMessage \
+        -H "Authorization: Bearer $token" -H "Content-type: application/json; charset=utf-8" \
+        -d "{\"channel\":\"C0CGRELFAMT\",\"text\":\"Watchdog: the factory stopped answering for about 4 minutes and was restarted at $(date -u +%H:%M) UTC. Logs are on the server in ~/openbot-hang-$stamp.log.\"}" \
+        >/dev/null 2>&1 || true
+    fi
   fi
 fi
 
