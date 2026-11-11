@@ -1,8 +1,8 @@
 # One starting conversation per coworker. Everybody signed in may open each one.
 channels:
   - id: front-desk
-    name: Front desk
-    description: Ask the factory for anything. The Orchestrator hands it to the right coworker.
+    name: 00 Factory Master
+    description: Ask the factory for anything. 00 Factory Master hands it to the right coworker.
     permitted_agents: [orchestrator]
     allowed_groups: [all]
   - id: marketing
@@ -11,12 +11,27 @@ channels:
     permitted_agents: [marketing]
     allowed_groups: [all]
   - id: analytics
-    name: Analytics
+    name: 00 Analytics
     description: Questions answered with data, read-only.
     permitted_agents: [analytics]
     allowed_groups: [all]
   - id: software-factory
-    name: Software factory
+    name: 00 Software Factory
     description: Code changes as pull requests, from a Linear issue.
     permitted_agents: [software-factory]
+    allowed_groups: [all]
+  - id: recruitment
+    name: 00 Recruitment
+    description: Job descriptions, CV screening, onboarding and reviews.
+    permitted_agents: [recruitment]
+    allowed_groups: [all]
+  - id: strategy-pitch
+    name: 00 Strategy & Pitch
+    description: Pitches, one-pagers and key messages; finding researchers and advisers.
+    permitted_agents: [strategy-pitch]
+    allowed_groups: [all]
+  - id: aw-memory
+    name: 00 AW Memory
+    description: Meeting notes in, decisions and action items out; ask what was decided.
+    permitted_agents: [aw-memory]
     allowed_groups: [all]
