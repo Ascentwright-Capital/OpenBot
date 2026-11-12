@@ -100,6 +100,22 @@ function tlsOf(params: URLSearchParams, bunVersion: string) {
 }
 
 /**
+ * How long Postgres lets a session sit inside a transaction with no statement running.
+ *
+ * A transaction nobody finishes holds its locks for as long as its session lives. On 11 November
+ * 2026 a connection failed while reading a reply mid-transaction, four sessions then sat "idle in
+ * transaction" for six hours, and every signed-in request hung behind them until the server was
+ * restarted (AP-126, AP-127). With this set, Postgres ends such a session itself: its locks go, the
+ * pool drops the dead connection and opens another, and the next request is served.
+ *
+ * It counts only time spent idle between statements, so a slow statement is not cut off. No
+ * transaction here waits on anything but the database between its statements, which is what makes a
+ * minute generous. A deployment that wants another limit sets
+ * `?idle_in_transaction_session_timeout=<ms>` on DATABASE_URL (0 turns it off).
+ */
+export const IDLE_IN_TRANSACTION_TIMEOUT_MS = 60_000;
+
+/**
  * The address, taken apart, because Bun will not take it whole on every platform.
  *
  * `new SQL("postgres://user:pass@host:5432/openbot")` works on macOS and Linux and cannot work on
@@ -152,11 +168,14 @@ export function addressOf(
    * become the `tls` option below.
    */
   const tls = tlsOf(url.searchParams, bunVersion);
-  const connection = Object.fromEntries(
-    [...url.searchParams].filter(
-      ([name]) => name !== "sslmode" && name !== "sslrootcert",
+  const connection: Record<string, string> = {
+    idle_in_transaction_session_timeout: String(IDLE_IN_TRANSACTION_TIMEOUT_MS),
+    ...Object.fromEntries(
+      [...url.searchParams].filter(
+        ([name]) => name !== "sslmode" && name !== "sslrootcert",
+      ),
     ),
-  );
+  };
 
   /*
    * A port that is not a port is refused before a socket is ever opened.
@@ -183,7 +202,7 @@ export function addressOf(
     username: decodePart(url.username, "username"),
     password: decodePart(url.password, "password"),
     database,
-    ...(Object.keys(connection).length > 0 ? { connection } : {}),
+    connection,
     ...tls,
   };
 }
