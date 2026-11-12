@@ -12,7 +12,11 @@ import {
   signInWith,
   signInWithEmailDomain,
 } from "@/lib/auth/client";
-import { resumeUrlFor, verifierPathFor } from "@/lib/auth/resume";
+import {
+  oauthResumePath,
+  resumeUrlFor,
+  verifierPathFor,
+} from "@/lib/auth/resume";
 import { appConfig } from "@/lib/generated/application-config";
 import { searchTextEntry } from "@/lib/search-text";
 import {
@@ -61,6 +65,9 @@ export const Route = createFileRoute("/sign")({
        * the verifier was ever made. `reloadDocument` makes this a document navigation, which is
        * the only kind that leaves the app and therefore the only kind that arrives.
        */
+      // Claude asked to connect while this person was signed out: carry on with that request.
+      const authorize = oauthResumePath(window.location.search);
+      if (authorize) throw redirect({ href: authorize, reloadDocument: true });
       const verifier = verifierPathFor(search.flow_id);
       throw verifier
         ? redirect({ href: verifier, reloadDocument: true })
@@ -82,6 +89,11 @@ function SignScreen() {
   const { data: options } = useQuery(authProvidersQueryOptions());
   const providers = options?.providers ?? [];
   const [email, setEmail] = useState("");
+  // Where sign-in returns to: an interrupted OAuth request from Claude, else the usual resume.
+  const authorize = oauthResumePath(window.location.search);
+  const returnTo = authorize
+    ? `${window.location.origin}${authorize}`
+    : resumeUrlFor(window.location.origin, flowId);
 
   /**
    * Sign in through whichever identity provider covers this address.
@@ -95,11 +107,7 @@ function SignScreen() {
     setOpening("sso");
 
     try {
-      await signInWithEmailDomain(
-        email,
-        undefined,
-        resumeUrlFor(window.location.origin, flowId),
-      );
+      await signInWithEmailDomain(email, undefined, returnTo);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -115,11 +123,7 @@ function SignScreen() {
     setOpening(provider);
 
     try {
-      await signInWith(
-        provider,
-        undefined,
-        resumeUrlFor(window.location.origin, flowId),
-      );
+      await signInWith(provider, undefined, returnTo);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error

@@ -15,6 +15,7 @@ import { Route as AuthedAppRouteImport } from './routes/_authed/_app'
 import { Route as AuthedAdminRouteRouteImport } from './routes/_authed/admin/route'
 import { Route as AuthedOnboardingRouteImport } from './routes/_authed/onboarding'
 import { Route as AuthedSettingsRouteRouteImport } from './routes/_authed/settings/route'
+import { Route as ConnectConsentRouteImport } from './routes/connect/consent'
 import { Route as AuthedAppIndexRouteImport } from './routes/_authed/_app/index'
 import { Route as AuthedAppApprovalsRouteImport } from './routes/_authed/_app/approvals'
 import { Route as AuthedAppBotRouteImport } from './routes/_authed/_app/bot'
@@ -107,6 +108,11 @@ const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AuthedRoute,
+} as any)
+const ConnectConsentRoute = ConnectConsentRouteImport.update({
+  id: '/connect/consent',
+  path: '/connect/consent',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedAppIndexRoute = AuthedAppIndexRouteImport.update({
   id: '/',
@@ -466,6 +472,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthedAdminRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
   '/onboarding': typeof AuthedOnboardingRoute
+  '/connect/consent': typeof ConnectConsentRoute
   '/approvals': typeof AuthedAppApprovalsRoute
   '/bot': typeof AuthedAppBotRoute
   '/capabilities': typeof AuthedAppCapabilitiesRouteWithChildren
@@ -534,6 +541,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthedAppIndexRoute
   '/sign': typeof SignRoute
   '/onboarding': typeof AuthedOnboardingRoute
+  '/connect/consent': typeof ConnectConsentRoute
   '/approvals': typeof AuthedAppApprovalsRoute
   '/bot': typeof AuthedAppBotRoute
   '/memory': typeof AuthedAppMemoryRoute
@@ -605,6 +613,7 @@ export interface FileRoutesById {
   '/_authed/settings': typeof AuthedSettingsRouteRouteWithChildren
   '/_authed/_app': typeof AuthedAppRouteWithChildren
   '/_authed/onboarding': typeof AuthedOnboardingRoute
+  '/connect/consent': typeof ConnectConsentRoute
   '/_authed/_app/approvals': typeof AuthedAppApprovalsRoute
   '/_authed/_app/bot': typeof AuthedAppBotRoute
   '/_authed/_app/capabilities': typeof AuthedAppCapabilitiesRouteWithChildren
@@ -678,6 +687,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/settings'
     | '/onboarding'
+    | '/connect/consent'
     | '/approvals'
     | '/bot'
     | '/capabilities'
@@ -746,6 +756,7 @@ export interface FileRouteTypes {
     | '/'
     | '/sign'
     | '/onboarding'
+    | '/connect/consent'
     | '/approvals'
     | '/bot'
     | '/memory'
@@ -816,6 +827,7 @@ export interface FileRouteTypes {
     | '/_authed/settings'
     | '/_authed/_app'
     | '/_authed/onboarding'
+    | '/connect/consent'
     | '/_authed/_app/approvals'
     | '/_authed/_app/bot'
     | '/_authed/_app/capabilities'
@@ -885,6 +897,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   SignRoute: typeof SignRoute
+  ConnectConsentRoute: typeof ConnectConsentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -930,6 +943,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AuthedSettingsRouteRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/connect/consent': {
+      id: '/connect/consent'
+      path: '/connect/consent'
+      fullPath: '/connect/consent'
+      preLoaderRoute: typeof ConnectConsentRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authed/_app/': {
       id: '/_authed/_app/'
@@ -1574,6 +1594,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   SignRoute: SignRoute,
+  ConnectConsentRoute: ConnectConsentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
