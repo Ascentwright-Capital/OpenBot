@@ -173,7 +173,7 @@ import {
 import { createDeliveryRouter, DELIVERY_WORK_KINDS } from "./delivery/router";
 import { configuredDeliveryProviders } from "./delivery/routes";
 import { createDeliveryScopes } from "./delivery/scope";
-import { createDeliveryStore } from "./delivery/store";
+import { createDeliveryStore, threadBindingIdentity } from "./delivery/store";
 import type { DeliveryScope } from "./delivery/types";
 import { DeliveryRefusedError } from "./delivery/types";
 import { currentEdition, editionHasMemory, setEdition } from "./edition";
@@ -719,6 +719,7 @@ let deliveryNotifications: (
 ) => Promise<void> = async () => {
   throw new Error("Delivery is not initialized.");
 };
+let deliveryHandoffs: (threadId: string) => void = () => {};
 
 /**
  * Who a routine acts as, resolved the way {@link resolveRequestActor} resolves it.
@@ -2061,7 +2062,16 @@ const agentFetch = createAgentFetch({
   },
 });
 const { coordination, coordinationForActor } = wireCoordination({
-  handoffDesk,
+  handoffDesk: {
+    ...handoffDesk,
+    // A hand-off made during a paired chat turn keeps that turn open for the answer.
+    send: async (input) => {
+      const outcome = await handoffDesk.send(input);
+      if (outcome.ok && input.from.threadId)
+        deliveryHandoffs(input.from.threadId);
+      return outcome;
+    },
+  },
   config,
   approvalService,
   agentProfileStore,
@@ -2564,6 +2574,39 @@ const deliveryRouter = createDeliveryRouter({
   providers: deliveryProviders,
   authoriseScope: authoriseDeliveryScope,
   scopeFor: deliveryScopeFor,
+  /*
+   * A shared Slack thread's own conversation with the Bot, so one thread never reads another. Made
+   * on the thread's first message, named after it, and kept as a second binding of the same person.
+   */
+  threadBinding: async (person, thread) => {
+    const identity = threadBindingIdentity(person.identity, thread.key);
+    const found = await deliveryStore.findBinding(
+      person.transport,
+      person.realm,
+      identity,
+    );
+    if (found && (await authoriseDeliveryScope(found))) return found;
+    const actor = await actorFor(person.ownerUserId);
+    const channel = await channelStore.create(actor, [person.agentId]);
+    const title = thread.title.replace(/\s+/g, " ").trim();
+    await database
+      .update(channels)
+      .set({
+        name: `Slack: ${title.length > 60 ? `${title.slice(0, 59)}…` : title}`,
+      })
+      .where(eq(channels.id, channel.id));
+    return deliveryStore.bind({
+      ownerUserId: person.ownerUserId,
+      channelId: channel.id,
+      agentId: person.agentId,
+      threadId: channel.threadId,
+      transport: person.transport,
+      realm: person.realm,
+      identity,
+      address: person.address,
+      mentionId: person.mentionId,
+    });
+  },
   notifyEvent: (event) => responsibilityEngine.ingest(event),
   runTurn: async (input) => {
     if (!(await authoriseDeliveryScope(input)))
@@ -2625,6 +2668,7 @@ const deliveryRouter = createDeliveryRouter({
     }),
 });
 deliveryNotifications = (scope, input) => deliveryRouter.notify(scope, input);
+deliveryHandoffs = (threadId) => deliveryRouter.noteHandoff(threadId);
 
 /*
  * Started work: an item a check-in raised, started by the person, runs as a task in a conversation
@@ -2861,6 +2905,7 @@ if (config.handoff.maxDepth > 0 && config.handoff.maxPerRun > 0) {
     threadIdentity,
     groupConversations,
     channelStore,
+    notify: (scope, input) => deliveryNotifications(scope, input),
   });
 }
 

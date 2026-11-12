@@ -40,7 +40,11 @@ import {
   textEvents,
 } from "./opentag";
 import type { DeliveryRouter } from "./router";
-import type { DeliveryStore } from "./store";
+import {
+  type DeliveryStore,
+  personIdentity,
+  threadBindingIdentity,
+} from "./store";
 import {
   type ChatTransport,
   type DeliveryBinding,
@@ -87,7 +91,7 @@ export type PairedApprovals = {
 
 export type OpenTagAgentDeps = {
   opentag: OpenTagTransport;
-  router: Pick<DeliveryRouter, "converse" | "notify">;
+  router: Pick<DeliveryRouter, "converse" | "notify" | "awaitReply">;
   store: Pick<
     DeliveryStore,
     | "findBinding"
@@ -231,6 +235,11 @@ export async function handleOpenTagRun(
     try {
       const outcome = await answer(deps, input, signal);
       say(outcome.text);
+      // Another Bot's answer, relayed by this one, in the same thread rather than a direct message.
+      if (outcome.followUp) {
+        const more = await outcome.followUp;
+        say(more ?? HANDOFF_REPLY_LATE);
+      }
       // The Bot's charts, drawn natively by the Channel when it offers its chart component.
       if (input.tools.some((tool) => tool.name === OPENTAG_CHART_TOOL))
         for (const component of outcome.components ?? []) {
@@ -284,11 +293,13 @@ async function answer(
   text: string;
   interrupt?: unknown;
   components?: DrawnComponent[];
+  /** The Bot's next reply, when this turn handed work to another Bot and is waiting on it. */
+  followUp?: Promise<string | null>;
 }> {
   // The Channel drew our chart and runs us again with its result; the turn already answered.
   if (isComponentFollowUp(input)) return { text: "" };
   const resume = resumeFromInput(input);
-  if (resume) return decideFromCard(deps, resume);
+  if (resume) return decideFromCard(deps, resume, input.threadId, signal);
 
   const sender = senderFromContext(input);
   if (!sender)
@@ -320,7 +331,12 @@ async function answer(
   });
   const bound = await ownedBinding(deps, sender);
   if (!bound) return { text: linkInstructions(sender.transport) };
-  const answered = await answerOpenQuestion(deps, bound, message.text);
+  // A shared thread has a conversation of its own; a direct message stays the person's main one.
+  const thread = sender.private
+    ? undefined
+    : { key: input.threadId, title: message.text };
+  const here = thread ? await threadBindingOf(deps, bound, thread.key) : bound;
+  const answered = here && (await answerOpenQuestion(deps, here, message.text));
   if (answered) {
     const bot = await deps.store.botIdentity(bound.agentId);
     return {
@@ -338,6 +354,7 @@ async function answer(
       : `${input.threadId}:${message.id ?? input.runId}`,
     text: message.text,
     signal,
+    ...(thread ? { thread } : {}),
   });
   if (result.kind === "unbound")
     return { text: linkInstructions(sender.transport) };
@@ -345,30 +362,55 @@ async function answer(
     return { text: "I already passed that message to your Bot." };
   if (result.kind === "failed") return { text: `${result.message}` };
 
-  if (!sender.private) return answerPrivately(deps, result);
+  if (!sender.private && !deps.opentag.config.answerInChannels)
+    return answerPrivately(deps, result);
 
   const questions = result.extras.questions.map((q) => q.text);
   const approvalId = result.extras.approvals[0];
   const parts = [result.replyText, ...questions].filter(Boolean);
   if (questions.length) parts.push("Reply here to answer.");
   if (approvalId) {
+    // The card names its approver, OpenTag lets only that person press it, and the decision is
+    // made only as their binding's owner — so in a shared thread (reached only when its answers are
+    // posted there anyway) it is shown in place rather than sent away to the owner's DM.
     const card = await approvalCard(deps, result.binding, approvalId);
     if (result.extras.approvals.length > 1)
       parts.push(
         `${result.extras.approvals.length - 1} more approval request(s) are waiting on the Bot's page in OpenBot.`,
       );
     if (card) return { text: parts.join("\n\n"), interrupt: card };
-    parts.push(
-      "Your Bot is waiting for an approval. Open the Bot's page in OpenBot to review it.",
-    );
+    if (!sender.private) {
+      await notifyApprovals(deps, result);
+      parts.push(
+        "I need your approval before I continue, so I sent the request to you directly.",
+      );
+    } else
+      parts.push(
+        "Your Bot is waiting for an approval. Open the Bot's page in OpenBot to review it.",
+      );
   } else if (result.kind === "waiting" && !parts.length) {
     parts.push("Your Bot is waiting for a person. Open OpenBot to continue.");
   }
   return {
     text: parts.join("\n\n") || "Done.",
     ...(result.components ? { components: result.components } : {}),
+    // Listening as soon as the turn ends: the other Bot's answer comes back as this Bot's next reply.
+    ...(result.extras.handoffs > 0 && !approvalId
+      ? {
+          followUp: deps.router.awaitReply(
+            result.binding.threadId,
+            HANDOFF_REPLY_WAIT_MS,
+            signal,
+          ),
+        }
+      : {}),
   };
 }
+
+/** How long a turn that handed work to another Bot stays open to carry the answer into its thread. */
+const HANDOFF_REPLY_WAIT_MS = 120_000;
+const HANDOFF_REPLY_LATE =
+  "That is taking a while. I'll send you the answer directly when it's in.";
 
 /**
  * The conversation may include other people, and the turn's output comes from the owner's private
@@ -402,6 +444,27 @@ async function answerPrivately(
       kind: "question",
       requestId: question.id,
     });
+  await notifyApprovals(deps, result);
+  return {
+    text: "Other people may be able to read this conversation, so I sent my answer to you directly.",
+  };
+}
+
+/** Each approval the turn is waiting on, to the owner through the delivery outbox. */
+async function notifyApprovals(
+  deps: OpenTagAgentDeps,
+  result: Extract<
+    Awaited<ReturnType<DeliveryRouter["converse"]>>,
+    { extras: unknown }
+  >,
+) {
+  if (!result.extras.approvals.length) return;
+  const scope = {
+    ownerUserId: result.binding.ownerUserId,
+    channelId: result.binding.channelId,
+    agentId: result.binding.agentId,
+    threadId: result.binding.threadId,
+  };
   const bot = await deps.store.botIdentity(result.binding.agentId);
   for (const approvalId of result.extras.approvals)
     await deps.router.notify(scope, {
@@ -410,9 +473,6 @@ async function answerPrivately(
       kind: "approval",
       requestId: approvalId,
     });
-  return {
-    text: "Other people may be able to read this conversation, so I sent my answer to you directly.",
-  };
 }
 
 /**
@@ -536,7 +596,7 @@ async function approvalCard(
     approvalId,
     // In the words the approval card in OpenBot uses, never the tool's id ("Your Bot: computer_click").
     action: `${bot?.name ?? "Your Bot"} wants to ${approvalPhrase(record.action)}`,
-    approver: `${binding.transport}:${binding.identity}`,
+    approver: `${binding.transport}:${personIdentity(binding.identity)}`,
     effect: record.action.effect,
     // The approvals preview already redacts secrets and private content.
     fields: approvalFields(approvalPreview(record.action.args)),
@@ -544,9 +604,14 @@ async function approvalCard(
   });
 }
 
+/** How long an approval card's turn waits to carry the Bot's answer into its thread. */
+const CARD_REPLY_WAIT_MS = 90_000;
+
 async function decideFromCard(
   deps: OpenTagAgentDeps,
   resume: NonNullable<ReturnType<typeof resumeFromInput>>,
+  thread: string,
+  signal?: AbortSignal,
 ): Promise<{ text: string }> {
   if (resume.invalid)
     return {
@@ -563,11 +628,13 @@ async function decideFromCard(
     };
   // The clicker is mapped exactly like a message sender; OpenTag already refused anyone but the
   // named approver, and OpenBot then decides only as that binding's owner.
-  const binding = await ownedBinding(deps, person);
-  if (!binding)
+  const owned = await ownedBinding(deps, person);
+  if (!owned)
     return {
       text: "You are not linked to this approval's owner, so nothing was decided.",
     };
+  // The card's own thread, when that thread has a conversation of its own.
+  const binding = (await threadBindingOf(deps, owned, thread)) ?? owned;
   let record: Awaited<ReturnType<PairedApprovals["store"]["get"]>>;
   try {
     record = await deps.approvals.store.get(
@@ -593,14 +660,29 @@ async function decideFromCard(
     : resume.always && offersStandingRule(record.action)
       ? "allow_always"
       : "allow_once";
+  // Listening before deciding: the resume can answer within the sweep's next tick.
+  const reply = deps.router.awaitReply(
+    binding.threadId,
+    CARD_REPLY_WAIT_MS,
+    signal,
+  );
   await deps.approvals.decide(binding.ownerUserId, resume.approvalId, decision);
   const bot = await deps.store.botIdentity(record.action.botId);
   const name = bot?.name ?? "Your Bot";
+  const decided =
+    decision === "deny"
+      ? `Denied. ${name} won't ${approvalPhrase(record.action)}.`
+      : decision === "allow_always"
+        ? "Always allowed."
+        : "Allowed once.";
+  // The Bot's answer, here in the card's thread. Without one in time it arrives by direct message.
+  const text = await reply;
+  if (text) return { text: `${decided}\n\n${text}` };
   return {
     text:
       decision === "deny"
-        ? `Denied. ${name} won't ${approvalPhrase(record.action)}.`
-        : `${decision === "allow_always" ? "Always allowed" : "Allowed once"}. ${name} is continuing and will send its result here.`,
+        ? decided
+        : `${decided} ${name} is continuing and will send you its result.`,
   };
 }
 
@@ -650,6 +732,26 @@ async function feedSlackTriggers(
 }
 
 /** The sender's enabled binding, only while its owner still has that conversation and Bot. */
+/** The conversation one shared chat thread of this person's has had, if any. */
+async function threadBindingOf(
+  deps: OpenTagAgentDeps,
+  person: DeliveryBinding,
+  thread: string,
+) {
+  const binding = await deps.store.findBinding(
+    person.transport,
+    person.realm,
+    threadBindingIdentity(person.identity, thread),
+  );
+  if (!binding || binding.ownerUserId !== person.ownerUserId) return null;
+  const scope = await deps.scopeFor(
+    binding.ownerUserId,
+    binding.channelId,
+    binding.agentId,
+  );
+  return scope?.threadId === binding.threadId ? binding : null;
+}
+
 async function ownedBinding(
   deps: OpenTagAgentDeps,
   person: { transport: ChatTransport; realm: string; identity: string },

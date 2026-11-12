@@ -360,10 +360,12 @@ test("a second paired message waits for the first turn instead of colliding with
   const gate = new Promise<void>((resolve) => (open = resolve));
   const started: string[] = [];
   const router = createDeliveryRouter({
-    store: f.store,
+    // The fixture store is not a whole RouterStore, as in the tests above; these turns never reach the rest.
+    store: f.store as never,
     queue: f.queue,
     owner: "w",
     authoriseScope: async () => true,
+    scopeFor: async () => null,
     runTurn: async (input) => {
       started.push(input.text);
       if (input.text === "first") await gate;
@@ -393,8 +395,14 @@ test("a second paired message waits for the first turn instead of colliding with
       "I'm still working on your previous message. Send this one again once I've answered.",
   });
   open();
-  expect(await first).toMatchObject({ kind: "replied", replyText: "re: first" });
-  expect(await second).toMatchObject({ kind: "replied", replyText: "re: second" });
+  expect(await first).toMatchObject({
+    kind: "replied",
+    replyText: "re: first",
+  });
+  expect(await second).toMatchObject({
+    kind: "replied",
+    replyText: "re: second",
+  });
   expect(started).toEqual(["first", "second"]);
 });
 test("chat sends carry the Bot's identity; SMS after STOP is recorded opted out, not sent", async () => {
@@ -494,4 +502,81 @@ test("the person's update routing decides which transports carry each kind", asy
       return `${r.kind}:${r.transport}`;
     }),
   ).toEqual(["reply:push", "question:slack"]);
+});
+test("a reply awaited by an approval card's turn goes there, not to the outbox", async () => {
+  const f = fixture();
+  const waiting = f.router.awaitReply(binding.threadId, 5_000);
+  await f.router.notify(scope, { id: "r1", text: "Posted.", kind: "reply" });
+  expect(await waiting).toBe("Posted.");
+  expect(f.offered).toEqual([]);
+  // Only the next reply: the one after it goes out as usual.
+  await f.router.notify(scope, { id: "r2", text: "Later.", kind: "reply" });
+  expect(f.offered).toHaveLength(1);
+  // Unanswered in time, the card's turn moves on and nothing is held back.
+  expect(await f.router.awaitReply(binding.threadId, 5)).toBeNull();
+  await f.router.notify(scope, { id: "r3", text: "Late.", kind: "reply" });
+  expect(f.offered).toHaveLength(2);
+});
+test("a hand-off made during a paired chat turn is counted on that turn only", async () => {
+  const f = fixture({}, async (router) => {
+    router.noteHandoff(scope.threadId);
+    router.noteHandoff("some-other-thread");
+  });
+  const result = await f.router.converse({
+    transport: "slack",
+    realm: "T",
+    identity: "U",
+    externalId: "handoff-1",
+    text: "Ask Software factory",
+    signal: new AbortController().signal,
+  });
+  expect(result).toMatchObject({ extras: { handoffs: 1 } });
+});
+test("a message in a shared chat thread runs in that thread's own conversation", async () => {
+  const f = fixture();
+  const turns: unknown[] = [];
+  const asked: unknown[] = [];
+  const router = createDeliveryRouter({
+    // The fixture store is not a whole RouterStore, as in the tests above; these turns never reach the rest.
+    store: f.store as never,
+    queue: f.queue,
+    owner: "w",
+    authoriseScope: async () => true,
+    scopeFor: async () => null,
+    threadBinding: async (person, thread) => {
+      asked.push(thread);
+      return {
+        ...person,
+        identity: `${person.identity}#${thread.key}`,
+        channelId: "thread-channel",
+        threadId: "thread-conversation",
+      };
+    },
+    runTurn: async (input) => {
+      turns.push(input);
+      return { replyText: "Reply" };
+    },
+    providers: {},
+  });
+  const converse = (externalId: string, thread?: string) =>
+    router.converse({
+      transport: "slack",
+      realm: "T",
+      identity: "U",
+      externalId,
+      text: "Hi",
+      signal: new AbortController().signal,
+      ...(thread ? { thread: { key: thread, title: "Hi" } } : {}),
+    });
+  expect(await converse("t1", "slack-thread-1")).toMatchObject({
+    binding: { threadId: "thread-conversation" },
+  });
+  expect(turns[0]).toMatchObject({
+    channelId: "thread-channel",
+    threadId: "thread-conversation",
+  });
+  expect(asked).toEqual([{ key: "slack-thread-1", title: "Hi" }]);
+  // A direct message names no thread and stays in the person's own conversation.
+  await converse("t2");
+  expect(turns[1]).toMatchObject(scope);
 });

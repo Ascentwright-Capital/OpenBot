@@ -45,6 +45,8 @@ function fixture(
       args: Record<string, unknown>;
       target?: unknown;
     };
+    answerInChannels?: boolean;
+    cardReply?: string;
   } = {},
 ) {
   const calls: unknown[] = [];
@@ -71,6 +73,10 @@ function fixture(
         calls.push({ optOut: input });
         return 1;
       },
+      awaitReply: async (bindingId) => {
+        calls.push({ awaitReply: bindingId });
+        return options.cardReply ?? null;
+      },
       converse: async (input) => {
         calls.push({ converse: input });
         return (
@@ -79,7 +85,7 @@ function fixture(
             binding: bound,
             inboxId: "in1",
             replyText: "Hello from your Bot.",
-            extras: { approvals: [], questions: [] },
+            extras: { approvals: [], questions: [], handoffs: 0 },
           }
         );
       },
@@ -123,7 +129,10 @@ function fixture(
       ownerUserId === "owner"
         ? { ownerUserId, channelId, agentId, threadId: "canonical" }
         : null,
-    slack: createOpenTagTransport({ secret: SECRET }),
+    slack: createOpenTagTransport({
+      secret: SECRET,
+      ...(options.answerInChannels ? { answerInChannels: true } : {}),
+    }),
     ingestSlack: async (event) => {
       calls.push({ trigger: event });
       return { matched: 0, deliveries: [] };
@@ -580,7 +589,7 @@ test("bound sender runs the canonical turn and an approval becomes an OpenTag ca
       binding: bound,
       inboxId: "in1",
       replyText: "",
-      extras: { approvals: [APPROVAL], questions: [] },
+      extras: { approvals: [APPROVAL], questions: [], handoffs: 0 },
     },
   });
   const result = await run(f, {
@@ -624,7 +633,7 @@ test("a check-in task's approval becomes a card without Always allow, and an old
       binding: bound,
       inboxId: "in1",
       replyText: "",
-      extras: { approvals: [APPROVAL], questions: [] },
+      extras: { approvals: [APPROVAL], questions: [], handoffs: 0 },
     },
   });
   const result = await run(f, {
@@ -664,6 +673,7 @@ test("in a conversation others may read, the answer goes to the owner privately"
       extras: {
         approvals: [APPROVAL],
         questions: [{ id: "q1", text: "Research Bot asks: which quarter?" }],
+        handoffs: 0,
       },
     },
   });
@@ -691,6 +701,43 @@ test("in a conversation others may read, the answer goes to the owner privately"
     expect(sent.map((n) => n?.kind)).toEqual(["reply", "question", "approval"]);
     expect(sent[0]?.text).toBe("Your salary review is attached.");
   }
+});
+test("with OPENTAG_ANSWER_IN_CHANNELS, a shared thread gets the answer and the approval card", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    converse: {
+      kind: "waiting",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "Leads are up 12% this week.",
+      extras: {
+        approvals: [APPROVAL],
+        questions: [{ id: "q1", text: "Research Bot asks: which quarter?" }],
+        handoffs: 0,
+      },
+    },
+  });
+  const result = await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> status?" }],
+  });
+  expect(said(result.events)).toBe(
+    [
+      "Leads are up 12% this week.",
+      "Research Bot asks: which quarter?",
+      "Reply here to answer.",
+    ].join("\n\n"),
+  );
+  const interrupt = result.events.find(
+    (e) => e.type === "CUSTOM" && e.name === "on_interrupt",
+  ) as { value?: unknown } | undefined;
+  expect(interrupt).toBeDefined();
+  // Only the linked owner may press it.
+  expect(JSON.stringify(interrupt?.value)).toContain("slack:U1");
+  const sent = f.calls
+    .map((c) => (c as { notify?: [unknown, { kind: string }] }).notify?.[1])
+    .filter(Boolean);
+  expect(sent).toEqual([]);
 });
 test("verified Slack events feed the owners' triggers once, and observe-only runs stay quiet", async () => {
   const f = fixture();
@@ -797,7 +844,7 @@ test("a click waiting in Slack is named in words, with no tool id or page handle
       binding: bound,
       inboxId: "in1",
       replyText: "",
-      extras: { approvals: [APPROVAL], questions: [] },
+      extras: { approvals: [APPROVAL], questions: [], handoffs: 0 },
     },
   });
   const asked = await run(f, {
@@ -831,6 +878,97 @@ test("a click waiting in Slack is named in words, with no tool id or page handle
   expect(JSON.stringify([asked.events, denied.events])).not.toMatch(
     /computer_click|snapshotId|f3e43/,
   );
+});
+test("an approved card carries the Bot's answer into its own thread", async () => {
+  const f = fixture({ cardReply: "Posted the comment on AP-89." });
+  const text = said(
+    (
+      await run(f, {
+        forwardedProps: {
+          command: {
+            resume: {
+              "0f8fad5bd9cb469fa16570867728950e": {
+                confirmed: true,
+                by: "slack:T1:U1",
+              },
+            },
+          },
+        },
+      })
+    ).events,
+  );
+  expect(text).toContain("Allowed once.");
+  expect(text).toContain("Posted the comment on AP-89.");
+  expect(text).not.toContain("will send you its result");
+  expect(f.calls).toContainEqual({ awaitReply: expect.any(String) });
+});
+test("a turn that handed work to another Bot carries its answer into the same thread", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    cardReply: "Software factory found 3 repos.",
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "I've asked Software factory.",
+      extras: { approvals: [], questions: [], handoffs: 1 },
+    },
+  });
+  const result = await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> check github" }],
+  });
+  expect(said(result.events)).toBe(
+    "I've asked Software factory.Software factory found 3 repos.",
+  );
+  expect(f.calls).toContainEqual({ awaitReply: bound.threadId });
+});
+test("a hand-off answer that is late says it will come directly", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "I've asked Software factory.",
+      extras: { approvals: [], questions: [], handoffs: 1 },
+    },
+  });
+  const result = await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> check github" }],
+  });
+  expect(said(result.events)).toContain("send you the answer directly");
+});
+test("a turn without a hand-off does not wait", async () => {
+  const f = fixture({ answerInChannels: true });
+  await run(f, {
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> hi" }],
+  });
+  expect(f.calls.some((c) => "awaitReply" in (c as object))).toBe(false);
+});
+test("a shared thread asks for its own conversation; a direct message does not", async () => {
+  const f = fixture({ answerInChannels: true });
+  await run(f, {
+    threadId: "slack-thread-1",
+    context: [sender("slack:T1:U1", { id: "C0123456789", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> plan the week" }],
+  });
+  await run(f, {
+    threadId: "dm-thread",
+    context: [sender("slack:T1:U1", { id: "D0123456789", kind: "im" })],
+    messages: [{ id: "m2", role: "user", content: "hi" }],
+  });
+  const conversed = f.calls
+    .map((c) => (c as { converse?: { thread?: unknown } }).converse)
+    .filter(Boolean);
+  expect(conversed[0]?.thread).toEqual({
+    key: "slack-thread-1",
+    title: "plan the week",
+  });
+  expect(conversed).toHaveLength(2);
+  expect(Object.hasOwn(conversed[1] ?? {}, "thread")).toBe(false);
 });
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();
@@ -937,7 +1075,7 @@ test("a chart the Bot drew is drawn natively by the Channel, and its follow-up r
         },
         { name: "showRecord", args: { title: "Not a chart", fields: [] } },
       ],
-      extras: { approvals: [], questions: [] },
+      extras: { approvals: [], questions: [], handoffs: 0 },
     },
   });
   const offered = [{ name: "render_chart", description: "", parameters: {} }];
@@ -1046,7 +1184,7 @@ test("a chart drawn natively in Slack or Teams says where its figures came from"
         },
         { name: "showBarChart", args: { title: "Old", points } },
       ],
-      extras: { approvals: [], questions: [] },
+      extras: { approvals: [], questions: [], handoffs: 0 },
     },
   });
   const result = await run(f, {
