@@ -8,6 +8,19 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 
 ## Unreleased
 
+### Security updates
+
+- The images are built with Bun 1.4.4 and Node.js 24.22.2, which fix a remote code execution flaw in
+  the Brotli decoder (CVE-2026-111497). A deployment takes the fix by pulling or rebuilding its
+  images; a clone needs Bun 1.4.4.
+- The MCP SDK is 1.32.2, which fixes two ways one HTTP request could exhaust an MCP server's memory
+  (GHSA-f897-62hf-6gxq and CVE-2026-111768). OpenBot only uses the SDK as a client, to call the MCP
+  servers behind work apps, and serves no MCP endpoint of its own.
+- Hono is 4.13.17 in the server and the supervisor, which fixes four advisories published on
+  November 1. Two of them let a request path slip past middleware attached with a wildcard or to a
+  mounted route (GHSA-4m76-xfj5-7975, GHSA-h7mg-cq63-vhpq), which is how the server attaches its
+  sign-in check.
+
 ## 0.2.0
 
 **Before upgrading.** Two things change for an existing deployment:

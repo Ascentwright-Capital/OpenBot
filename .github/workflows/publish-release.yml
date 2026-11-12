@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - env:
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
@@ -215,7 +215,7 @@ jobs:
       # which is why this is here and not on the `openbot` image above: that one is pulled by servers
       # with whatever they have, and these are pulled by an installer that ships Podman. After the
       # Chromium-only `agent-computer` Dockerfile change, while keeping Node/npm/npx from the
-      # official Node 24.18.1 image, local zstd OCI layer descriptors measured 535.0 MiB on arm64
+      # official Node 24.22.2 image, local zstd OCI layer descriptors measured 535.0 MiB on arm64
       # and 518.1 MiB on amd64.
       - id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
