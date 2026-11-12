@@ -20,13 +20,23 @@ flock -n 9 || exit 0
 # Caddy logs and returns as its own 502. So five or more of those in the last two minutes also
 # count as a failed check. A 502 that OpenBot sends itself reaches the browser as 424 (Caddyfile)
 # and is not counted.
+#
+# A deploy or a restart answers 502 while OpenBot starts (AP-129). On 12 Nov those 502s alone made
+# the watchdog restart a healthy factory and say in Slack that it had stopped. So both touch
+# $settled when they finish, and the count only covers the time since then.
 unhealthy="$HOME/.digital-factory-unhealthy"
+settled="$HOME/.digital-factory-settled"
+window=2m
+if [ -f "$settled" ]; then
+  age=$(( $(date +%s) - $(date -r "$settled" +%s) ))
+  [ "$age" -ge 0 ] && [ "$age" -lt 120 ] && window="$(( age + 1 ))s"
+fi
 reason=""
 if ! docker compose --env-file .env exec -T caddy wget -q -T 10 -O /dev/null http://openbot:3001/health >/dev/null 2>&1; then
   reason="failed /health"
 else
-  gateway=$(docker compose --env-file .env logs --since 2m caddy 2>&1 | grep -c '"status":502' || true)
-  [ "${gateway:-0}" -ge 5 ] && reason="behind ${gateway} Caddy 502s in 2 minutes"
+  gateway=$(docker compose --env-file .env logs --since "$window" caddy 2>&1 | grep -c '"status":502' || true)
+  [ "${gateway:-0}" -ge 5 ] && reason="behind ${gateway} Caddy 502s in ${window}"
 fi
 if [ -z "$reason" ]; then
   rm -f "$unhealthy"
@@ -39,7 +49,10 @@ else
     echo "$(date -u +%FT%TZ) watchdog: openbot unhealthy ${misses} times, restarting (logs in ~/openbot-hang-$stamp.log)"
     docker compose --env-file .env logs --tail 300 openbot > "$HOME/openbot-hang-$stamp.log" 2>&1 || true
     docker compose --env-file .env restart openbot || true
+    # `restart` returns before OpenBot answers; wait for its health check before marking the time.
+    docker compose --env-file .env up -d --wait --wait-timeout 120 openbot >/dev/null 2>&1 || true
     rm -f "$unhealthy"
+    touch "$settled"
     # Say so in Slack #00-digital-factory through the Factory app, so nobody has to log in to notice.
     # Only this notice is posted; the log lines stay on the droplet.
     token=$(sed -n 's/^OPENTAG_SLACK_BOT_TOKEN=//p' .env | head -n 1 | tr -d '"')
@@ -84,4 +97,5 @@ if echo "$changed" | grep -q "Caddyfile"; then
 fi
 echo "$target" > "$state"
 rm -f "$failed"
+touch "$settled"
 echo "$(date -u +%FT%TZ) deployed $target"

@@ -152,8 +152,11 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
   `/health` does not touch the database, so the 502 count catches an OpenBot whose signed-in requests
   hang while `/health` still answers. Two misses in a row, about four minutes, save the last 300 log
   lines to `~/openbot-hang-<time>.log` and restart `openbot`, because a hung OpenBot does not exit and
-  so `restart: unless-stopped` never fires. In `/var/log/digital-factory-deploy.log`, the line
-  `watchdog: openbot ... (miss <n>)` marks each miss and `watchdog: openbot unhealthy` marks each restart.
+  so `restart: unless-stopped` never fires. A deploy or a watchdog restart touches
+  `~/.digital-factory-settled` once OpenBot is healthy again, and the 502 count only covers the time
+  since then, so the 502s of OpenBot starting up are not a miss (AP-129). In
+  `/var/log/digital-factory-deploy.log`, the line `watchdog: openbot ... (miss <n>)` marks each miss
+  and `watchdog: openbot unhealthy` marks each restart.
 - **Idle transactions:** PostgreSQL ends any session that sits inside a transaction for a minute
   without running a statement (`idle_in_transaction_session_timeout`, AP-127). That is what hung the
   signed-in requests on 11 November; the watchdog above stays as the backstop.
