@@ -108,6 +108,12 @@ after an approval, a Bot's questions and routine results arrive by DM through ou
 Only people who linked their Slack (step 5) get answers; anyone else is told how to link. Each
 person's messages reach their own linked Bot.
 
+**Posts made through an app.** Slack marks a message an app posts for someone ("Sent using
+Claude") as an app's, and OpenTag ignores those so a bot can never answer itself. The accounts in
+`OPENTAG_TRUSTED_APP_SENDERS` are the exception: their app posts count as that person asking
+(AP-119). The default in `compose.yaml` is the shared ascentwright account (`U0CD7JBKWP2`), which
+Claude sessions post as. The account still has to link its Slack like anyone else.
+
 ## Coworkers (AP-89)
 
 The coworkers live in [`tenant/`](tenant/README.md): Orchestrator (the front desk people reach in
