@@ -12,6 +12,7 @@ import {
   signInWith,
   signInWithEmailDomain,
 } from "@/lib/auth/client";
+import { oauthResumePath } from "@/lib/auth/resume";
 import { appConfig } from "@/lib/generated/application-config";
 import {
   type AuthProviderId,
@@ -31,6 +32,9 @@ export const Route = createFileRoute("/sign")({
       currentUserQueryOptions(),
     );
     if (user) {
+      // Claude asked to connect while this person was signed out: carry on with that request.
+      const authorize = oauthResumePath(window.location.search);
+      if (authorize) throw redirect({ href: authorize, reloadDocument: true });
       throw redirect({ to: "/" });
     }
     // Loaded here so the screen paints with its buttons rather than painting empty and then
@@ -48,6 +52,11 @@ function SignScreen() {
   const { data: options } = useQuery(authProvidersQueryOptions());
   const providers = options?.providers ?? [];
   const [email, setEmail] = useState("");
+  // Where sign-in returns to: an interrupted OAuth request from Claude, else the app.
+  const authorize = oauthResumePath(window.location.search);
+  const returnTo = authorize
+    ? `${window.location.origin}${authorize}`
+    : window.location.origin;
 
   /**
    * Sign in through whichever identity provider covers this address.
@@ -61,7 +70,7 @@ function SignScreen() {
     setOpening("sso");
 
     try {
-      await signInWithEmailDomain(email);
+      await signInWithEmailDomain(email, undefined, returnTo);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -77,7 +86,7 @@ function SignScreen() {
     setOpening(provider);
 
     try {
-      await signInWith(provider);
+      await signInWith(provider, undefined, returnTo);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
