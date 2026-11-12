@@ -25,6 +25,21 @@ channels:
     description: "Code changes as pull requests from a Linear issue; requests for new or changed coworkers."
     permitted_agents: [software-factory]
     allowed_groups: [all]
+  - id: cto
+    name: 00-cto
+    description: "Changes to ascentwright.com and tech questions for the holding."
+    permitted_agents: [cto]
+    allowed_groups: [all]
+  - id: adiruang-cto
+    name: 01-adiruang-cto
+    description: "Changes to the Adiruang website, including the consultation booking."
+    permitted_agents: [adiruang-cto]
+    allowed_groups: [all]
+  - id: nusa-auto-cto
+    name: 02-nusa-auto-cto
+    description: "Questions and small changes for the Nusa Auto app."
+    permitted_agents: [nusa-auto-cto]
+    allowed_groups: [all]
   - id: analytics
     name: 00-analytics
     description: "Questions answered with data, read-only."
