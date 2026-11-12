@@ -65,9 +65,9 @@ services:
   opentag:
     profiles: ["slack"]
     build:
-      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-63b3904a540129966a5e4db94038064189e68a1d}
+      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-1755c2881203be203fd081e106ae5eb26dfc27a7}
       dockerfile: deployment/docker/runtime.Dockerfile
-    image: digital-factory/opentag-runtime:${OPENTAG_REF:-63b3904a540129966a5e4db94038064189e68a1d}
+    image: digital-factory/opentag-runtime:${OPENTAG_REF:-1755c2881203be203fd081e106ae5eb26dfc27a7}
     restart: unless-stopped
     environment:
       AGENT_URL: http://openbot:3001/api/delivery/webhooks/opentag/agent
@@ -77,6 +77,10 @@ services:
       AGENT_DISPLAY_NAME: ${OPENTAG_DISPLAY_NAME:-Factory}
       INTELLIGENCE_API_KEY: ${INTELLIGENCE_API_KEY}
       INTELLIGENCE_CHANNEL_NAME: ${INTELLIGENCE_CHANNEL_NAME:-digital-factory}
+      # Slack accounts whose posts through an app ("Sent using Claude") count as that person
+      # asking (AP-119). U0CD7JBKWP2 is the shared ascentwright account Claude sessions post as.
+      # Set it in .env to change the list; set it empty there to trust no app posts.
+      OPENTAG_TRUSTED_APP_SENDERS: ${OPENTAG_TRUSTED_APP_SENDERS-U0CD7JBKWP2}
       PORT: "3000"
     expose:
       - "3000"
