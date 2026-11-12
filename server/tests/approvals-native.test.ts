@@ -14,7 +14,8 @@ test("a real built-in native tool carries provider call identity and suspends AG
           {
             type: "TOOL_CALL_START",
             toolCallId: "provider-write-call",
-            toolCallName: "mcp__files__save",
+            // As the harness names it: a granted tool goes on the wire without its mcp__ prefix.
+            toolCallName: "files__save",
             parentMessageId: "provider-message",
           },
           {

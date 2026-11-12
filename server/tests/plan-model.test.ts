@@ -7,6 +7,7 @@ import {
   PlanModel,
   planMessages,
   planModelForEnvironment,
+  wireToolName,
 } from "../src/agents/plan-model";
 import { SEARCH_TOOLS, TOOL_SEARCH_FLOOR } from "../src/agents/tool-search";
 import { buildAgents } from "../src/copilot";
@@ -769,14 +770,15 @@ describe("a plan Bot past the search floor", () => {
         .match(/Tools found: ([^\n]*)/)?.[1]
         ?.split(", ");
       if (ran > 0) return { text: "One order came in." };
-      if (found?.includes(ORDERS) && offered.includes(ORDERS))
-        return { call: ORDERS, args: {} };
+      if (found?.includes(ORDERS) && offered.includes(wireToolName(ORDERS)))
+        return { call: wireToolName(ORDERS), args: {} };
       return { call: SEARCH_TOOLS, args: { query: "list orders" } };
     });
     expect(errors(seen)).toEqual([]);
     expect(offered[0]).toContain(SEARCH_TOOLS);
-    expect(offered[0]).not.toContain(ORDERS);
-    expect(offered[1]).toContain(ORDERS);
+    // On the wire a granted tool goes without its `mcp__` prefix (see wireToolName).
+    expect(offered[0]).not.toContain(wireToolName(ORDERS));
+    expect(offered[1]).toContain(wireToolName(ORDERS));
     expect(calls).toEqual(["composio-shopify/SHOPIFY_LIST_ORDERS"]);
   });
 
@@ -784,12 +786,15 @@ describe("a plan Bot past the search floor", () => {
     const { seen, offered, calls } = await run(({ ran }) =>
       ran > 0
         ? { text: "Your routine is set." }
-        : { call: CREATE_ROUTINE, args: { cron: "*/15 * * * *" } },
+        : {
+            call: wireToolName(CREATE_ROUTINE),
+            args: { cron: "*/15 * * * *" },
+          },
     );
     expect(errors(seen)).toEqual([]);
     expect(offered[0]).toContain(SEARCH_TOOLS);
-    expect(offered[0]).toContain(CREATE_ROUTINE);
-    expect(offered[0]).not.toContain(ORDERS);
+    expect(offered[0]).toContain(wireToolName(CREATE_ROUTINE));
+    expect(offered[0]).not.toContain(wireToolName(ORDERS));
     expect(calls).toEqual(["routines/create_routine"]);
   });
 });

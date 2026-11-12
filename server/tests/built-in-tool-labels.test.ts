@@ -32,8 +32,8 @@ const DECIDED_AT_RUN_TIME: Record<string, string> = {
     "A responsibility run's tools handed to the headless runner. Each is registered, and checked, where it is made.",
   "server/src/responsibilities/wiring.ts: tool.name":
     "A responsibility run's tools handed to the headless runner. Each is registered, and checked, where it is made.",
-  "server/src/agents/plan-model.ts: tool.name":
-    "The tools of the run it plans for, handed through unchanged.",
+  "server/src/agents/plan-model.ts: wireToolName(tool.name)":
+    "The tools of the run it plans for, handed through without the mcp__ prefix the harness adds its own in front of.",
   "server/src/proactive/restriction.ts: name":
     "A hidden refusal standing in for a tool a check-in was not given. The tool itself is registered elsewhere.",
   "server/src/components/headless.ts: spec.name":

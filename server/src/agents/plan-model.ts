@@ -294,7 +294,8 @@ export class PlanModel implements PlanLanguageModel {
     const messages = planMessages(options.prompt);
     const answerOnly = options.toolChoice?.type === "none";
     // The plan harnesses consume AG-UI tools, not the AI SDK's toolChoice. Omit the tools too.
-    const tools = (answerOnly ? [] : (options.tools ?? [])).map((tool) => {
+    const offered = answerOnly ? [] : (options.tools ?? []);
+    const tools = offered.map((tool) => {
       if (tool.type !== "function")
         throw new Error(
           "Built-in plan Bots only support caller-owned function tools.",
@@ -307,7 +308,7 @@ export class PlanModel implements PlanLanguageModel {
     });
     // Wire name back to the granted name every other part of OpenBot knows.
     const granted = new Map(
-      (options.tools ?? []).map((tool) => [wireToolName(tool.name), tool.name]),
+      offered.map((tool) => [wireToolName(tool.name), tool.name]),
     );
     if (granted.size !== tools.length)
       throw new Error("Two offered tools share a name on the plan harness.");
@@ -412,7 +413,7 @@ export class PlanModel implements PlanLanguageModel {
                       id: event.messageId,
                     });
                     break;
-                  case "TOOL_CALL_START":
+                  case "TOOL_CALL_START": {
                     if (!names.has(event.toolCallName)) {
                       /*
                        * Claude sometimes calls a granted tool without the harness's `mcp__ag_ui__`
@@ -446,6 +447,7 @@ export class PlanModel implements PlanLanguageModel {
                       toolName: name,
                     });
                     break;
+                  }
                   case "TOOL_CALL_ARGS": {
                     if (skipped.has(event.toolCallId)) break;
                     const call = calls.get(event.toolCallId);
