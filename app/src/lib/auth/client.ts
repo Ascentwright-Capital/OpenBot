@@ -36,11 +36,10 @@ export async function signInWith(
     callbackURL: string;
   }) => Promise<SocialResult> = (input) =>
     authClient.signIn.social(input as never) as Promise<SocialResult>,
+  // Where the browser returns to. The origin, unless sign-in interrupted something to resume.
+  callbackURL: string = window.location.origin,
 ) {
-  const result = await start({
-    provider,
-    callbackURL: window.location.origin,
-  });
+  const result = await start({ provider, callbackURL });
 
   if (result.error) {
     // Naming the provider matters more with three buttons than it did with one: "Could not start
@@ -72,8 +71,9 @@ export async function signInWithEmailDomain(
         signIn: { sso: (i: unknown) => Promise<SocialResult> };
       }
     ).signIn.sso(input),
+  callbackURL: string = window.location.origin,
 ) {
-  const result = await start({ email, callbackURL: window.location.origin });
+  const result = await start({ email, callbackURL });
 
   if (result.error) {
     throw new Error(

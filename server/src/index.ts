@@ -437,12 +437,13 @@ const identityProviderStore = createIdentityProviderStore(database);
  * store that receives those rows has to exist before anything can sign in.
  */
 const signInAuditStore = createAuditStore(database);
-const auth: AuthService | undefined = config.organizationAuthUrl
-  ? createOrganizationAuth({
-      authorityUrl: config.organizationAuthUrl,
-      materializeUser: organizationUserStore(database),
-    })
-  : config.auth
+/*
+ * This deployment's own Better Auth, when it signs people in itself. Kept by name because it is
+ * also the OAuth authorization server Claude signs in through (auth/oauth.ts); a deployment signed
+ * in by an organization authority has neither.
+ */
+const localAuth =
+  !config.organizationAuthUrl && config.auth
     ? createAuth(
         config,
         database,
@@ -450,6 +451,12 @@ const auth: AuthService | undefined = config.organizationAuthUrl
         signInAuditStore,
       )
     : undefined;
+const auth: AuthService | undefined = config.organizationAuthUrl
+  ? createOrganizationAuth({
+      authorityUrl: config.organizationAuthUrl,
+      materializeUser: organizationUserStore(database),
+    })
+  : localAuth;
 // Each computer is pushed its network policy on the way to the action that woke it, because a
 // computer refuses every connection until one arrives (see `withPolicyPushOnWake`).
 const computerProvider = config.computer
@@ -3186,6 +3193,12 @@ const app = createApp(
 
   identityStore,
   identityGithubCallback,
+  localAuth
+    ? {
+        jwks: () => localAuth.api.getJwks() as Promise<{ keys: unknown[] }>,
+        findPerson: (userId) => peopleStore.find(userId),
+      }
+    : undefined,
 );
 
 /**

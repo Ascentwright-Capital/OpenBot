@@ -8,14 +8,28 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 
 ## Unreleased
 
+**Before upgrading.** Migration `0054_oauth_provider` adds the OAuth tables behind the new MCP
+endpoint (below), all empty. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after
+changing the secret, delete the rows in `jwks`, and connected Claude clients sign in again.
+
+### Manage OpenBot from Claude
+
+OpenBot is now an MCP server at `/api/mcp`. Add it to claude.ai, the Claude app or Claude Code and
+Claude manages OpenBot as you: Bots, Team Bots and who they are shared with, the apps each Bot may
+use, and, for an admin, people, roles, capability switches and the audit trail. Claude signs in with
+OpenBot's own sign-in and you approve it on a consent screen, choosing whether it may only look or
+also change things. Every call runs through the same routes and checks as your browser, and the
+token works nowhere but `/api/mcp`. Only on a deployment that signs people in itself; see
+[Managing OpenBot from Claude](docs/claude-mcp.md).
+
 ### Security updates
 
 - The images are built with Bun 1.4.4 and Node.js 24.22.2, which fix a remote code execution flaw in
   the Brotli decoder (CVE-2026-111497). A deployment takes the fix by pulling or rebuilding its
   images; a clone needs Bun 1.4.4.
 - The MCP SDK is 1.32.2, which fixes two ways one HTTP request could exhaust an MCP server's memory
-  (GHSA-f897-62hf-6gxq and CVE-2026-111768). OpenBot only uses the SDK as a client, to call the MCP
-  servers behind work apps, and serves no MCP endpoint of its own.
+  (GHSA-f897-62hf-6gxq and CVE-2026-111768). OpenBot uses the SDK as a client, to call the MCP
+  servers behind work apps, and to serve its own endpoint at `/api/mcp` (above).
 - Hono is 4.13.17 in the server and the supervisor, which fixes four advisories published on
   November 1. Two of them let a request path slip past middleware attached with a wildcard or to a
   mounted route (GHSA-4m76-xfj5-7975, GHSA-h7mg-cq63-vhpq), which is how the server attaches its
