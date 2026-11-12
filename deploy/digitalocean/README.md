@@ -154,6 +154,8 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
   lines to `~/openbot-hang-<time>.log` and restart `openbot`, because a hung OpenBot does not exit and
   so `restart: unless-stopped` never fires. In `/var/log/digital-factory-deploy.log`, the line
   `watchdog: openbot ... (miss <n>)` marks each miss and `watchdog: openbot unhealthy` marks each restart.
+  A deploy or a watchdog restart clears the count, and 502s are not counted for three minutes after
+  either, because a restart itself makes Caddy answer 502 for a few seconds (AP-136).
 - **Idle transactions:** PostgreSQL ends any session that sits inside a transaction for a minute
   without running a statement (`idle_in_transaction_session_timeout`, AP-127). That is what hung the
   signed-in requests on 11 November; the watchdog above stays as the backstop.
