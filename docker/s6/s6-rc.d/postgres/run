@@ -3,6 +3,11 @@
 #
 # `EMBEDDED_POSTGRES=on` turns it on. Off, this service exits 0 immediately and s6 leaves it alone,
 # which is how one image serves both shapes without two Dockerfiles.
+#
+# No session may sit inside a transaction, doing nothing, for more than a minute. One that does holds
+# its locks until something ends it, and on 11 November 2026 nothing did for six hours (AP-127). Set
+# here as well as by the API's own pool (server/src/db/client.ts) so it also covers the connections
+# that do not come from that pool: the listeners, the sweeps and a person in psql.
 set -eu
 if [ "${EMBEDDED_POSTGRES:-off}" != "on" ]; then
   exec /bin/true
@@ -10,4 +15,5 @@ fi
 exec s6-setuidgid postgres /usr/lib/postgresql/16/bin/postgres \
   -D /var/lib/postgresql/data \
   -c listen_addresses=127.0.0.1 \
-  -c port=5432
+  -c port=5432 \
+  -c idle_in_transaction_session_timeout=60s
