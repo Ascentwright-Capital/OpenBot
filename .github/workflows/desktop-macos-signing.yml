@@ -86,7 +86,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
           no-cache: true
       - run: bun install --frozen-lockfile
         working-directory: desktop
@@ -295,7 +295,7 @@ jobs:
           echo "APPLE_API_KEY_PATH=$key" >> "$GITHUB_ENV"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
           no-cache: true
       # No caches in this job, Rust or Bun: it runs on release tags, and a signed, notarized build
       # must come from the tree and the lockfiles, not from anything an earlier run left behind.

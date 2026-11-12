@@ -66,7 +66,7 @@ jobs:
       # Updater regressions (no Apple access) and the main test suite; this checks the wiring here.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
           no-cache: true
       - name: Latest waits for the signed Windows installer
         run: bun test scripts/signing-workflows.test.ts
@@ -132,7 +132,7 @@ jobs:
       # behind. The same rule as Desktop macOS signing.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
           no-cache: true
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
@@ -257,7 +257,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.3
+          bun-version: 1.4.4
           no-cache: true
       # The Tauri CLI the build used, from the lockfile, to sign as `tauri build` signs.
       - run: bun install --frozen-lockfile

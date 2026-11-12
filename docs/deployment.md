@@ -247,7 +247,7 @@ published `agent-computer` Dockerfile both build from Ubuntu and run Playwright'
 final image layers. `--no-shell` leaves out Playwright's separate headless shell: every launch names a
 Chromium channel, and Playwright runs the full browser for a named channel even when headless. Keep that Playwright version matched to `agent-computer/package.json`; changing one without
 the other can make the browser protocol and executable revision diverge. The images keep the
-baseline Node command-line tools (`node`, `npm`, and `npx`) from the official Node 24.18.1 image.
+baseline Node command-line tools (`node`, `npm`, and `npx`) from the official Node 24.22.2 image.
 Measured as local zstd OCI layer descriptors against the previous Playwright-base `agent-computer`
 image, the compressed image fell from 884.2 MiB to 535.0 MiB on arm64 and from 894.6 MiB to
 518.1 MiB on amd64.

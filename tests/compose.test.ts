@@ -680,7 +680,7 @@ test("runs the server migrator after PostgreSQL becomes healthy", () => {
 test("builds the deployment image with Playwright's Chromium payload only", () => {
   for (const dockerfile of [rootDockerfile(), agentComputerDockerfile()]) {
     expect(dockerfile).toContain(
-      "FROM node:24.18.1-bookworm-slim AS node-toolchain",
+      "FROM node:24.22.2-bookworm-slim AS node-toolchain",
     );
     expect(dockerfile).toContain("FROM ubuntu:24.04");
     expect(dockerfile).not.toContain("mcr.microsoft.com/playwright");
