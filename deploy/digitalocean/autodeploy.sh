@@ -20,11 +20,19 @@ flock -n 9 || exit 0
 # Caddy logs and returns as its own 502. So five or more of those in the last two minutes also
 # count as a failed check. A 502 that OpenBot sends itself reaches the browser as 424 (Caddyfile)
 # and is not counted.
+#
+# A restart of OpenBot makes Caddy answer 502 for a few seconds, and those are not a hang (AP-136).
+# On 12 Nov two deploys 18 minutes apart each left one such miss, the count was never cleared in
+# between because no check runs during a deploy, and the watchdog restarted an OpenBot that had
+# just started. So a deploy and a watchdog restart both write the time to $restarted and clear the
+# count, and 502s are not counted for three minutes after it: the two minutes of log this reads,
+# and one more for the cron run to come round. A failed /health counts at any time.
 unhealthy="$HOME/.digital-factory-unhealthy"
+restarted="$HOME/.digital-factory-restarted"
 reason=""
 if ! docker compose --env-file .env exec -T caddy wget -q -T 10 -O /dev/null http://openbot:3001/health >/dev/null 2>&1; then
   reason="failed /health"
-else
+elif [ $(( $(date +%s) - $(cat "$restarted" 2>/dev/null || echo 0) )) -ge 180 ]; then
   gateway=$(docker compose --env-file .env logs --since 2m caddy 2>&1 | grep -c '"status":502' || true)
   [ "${gateway:-0}" -ge 5 ] && reason="behind ${gateway} Caddy 502s in 2 minutes"
 fi
@@ -40,6 +48,7 @@ else
     docker compose --env-file .env logs --tail 300 openbot > "$HOME/openbot-hang-$stamp.log" 2>&1 || true
     docker compose --env-file .env restart openbot || true
     rm -f "$unhealthy"
+    date +%s > "$restarted"
     # Say so in Slack #00-digital-factory through the Factory app, so nobody has to log in to notice.
     # Only this notice is posted; the log lines stay on the droplet.
     token=$(sed -n 's/^OPENTAG_SLACK_BOT_TOKEN=//p' .env | head -n 1 | tr -d '"')
@@ -68,6 +77,9 @@ echo "$target $((${tries:-0} + 1))" > "$failed"
 echo "$(date -u +%FT%TZ) deploying $target"
 # Only a fast-forward. A droplet with its own commits stops here and says so in the log.
 git -C "$repo" merge --ff-only -q origin/main
+# From here on OpenBot may be restarted, whether or not the deploy then succeeds. Whenever this run
+# ends, note the time and clear the watchdog's count, so those 502s are not read as a hang (AP-136).
+trap 'date +%s > "$restarted"; rm -f "$unhealthy"' EXIT
 # Every service, so a change to OPENBOT_REF, OPENTAG_REF or compose.yaml lands. Images whose source
 # did not change are reused from the build cache. `--wait` holds until every service is healthy, so a
 # deploy that starts but never comes up is not recorded and is tried again.
