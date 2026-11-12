@@ -14,15 +14,29 @@ flock -n 9 || exit 0
 # it. So every run first asks OpenBot's /health through Caddy's container (busybox wget). Two
 # failures in a row (about four minutes) save the last 300 log lines next to the deploy log and
 # restart openbot. A deploy in progress holds the lock above, so it never races this.
+#
+# /health does not touch the database (AP-126). On 12 Nov it answered 200 for hours while database
+# connections sat idle in a transaction and every signed-in request hung until Bun closed it, which
+# Caddy logs and returns as its own 502. So five or more of those in the last two minutes also
+# count as a failed check. A 502 that OpenBot sends itself reaches the browser as 424 (Caddyfile)
+# and is not counted.
 unhealthy="$HOME/.digital-factory-unhealthy"
-if docker compose --env-file .env exec -T caddy wget -q -T 10 -O /dev/null http://openbot:3001/health >/dev/null 2>&1; then
+reason=""
+if ! docker compose --env-file .env exec -T caddy wget -q -T 10 -O /dev/null http://openbot:3001/health >/dev/null 2>&1; then
+  reason="failed /health"
+else
+  gateway=$(docker compose --env-file .env logs --since 2m caddy 2>&1 | grep -c '"status":502' || true)
+  [ "${gateway:-0}" -ge 5 ] && reason="behind ${gateway} Caddy 502s in 2 minutes"
+fi
+if [ -z "$reason" ]; then
   rm -f "$unhealthy"
 else
   misses=$(( $(cat "$unhealthy" 2>/dev/null || echo 0) + 1 ))
   echo "$misses" > "$unhealthy"
+  echo "$(date -u +%FT%TZ) watchdog: openbot ${reason} (miss ${misses})"
   if [ "$misses" -ge 2 ]; then
     stamp=$(date -u +%Y%m%dT%H%M%SZ)
-    echo "$(date -u +%FT%TZ) watchdog: openbot failed /health ${misses} times, restarting (logs in ~/openbot-hang-$stamp.log)"
+    echo "$(date -u +%FT%TZ) watchdog: openbot unhealthy ${misses} times, restarting (logs in ~/openbot-hang-$stamp.log)"
     docker compose --env-file .env logs --tail 300 openbot > "$HOME/openbot-hang-$stamp.log" 2>&1 || true
     docker compose --env-file .env restart openbot || true
     rm -f "$unhealthy"
