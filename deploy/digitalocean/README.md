@@ -154,6 +154,9 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
   lines to `~/openbot-hang-<time>.log` and restart `openbot`, because a hung OpenBot does not exit and
   so `restart: unless-stopped` never fires. In `/var/log/digital-factory-deploy.log`, the line
   `watchdog: openbot ... (miss <n>)` marks each miss and `watchdog: openbot unhealthy` marks each restart.
+- **Idle transactions:** PostgreSQL ends any session that sits inside a transaction for a minute
+  without running a statement (`idle_in_transaction_session_timeout`, AP-127). That is what hung the
+  signed-in requests on 11 November; the watchdog above stays as the backstop.
 
 `setup.sh` installs the cron line. On a droplet set up before it existed, run as root:
 

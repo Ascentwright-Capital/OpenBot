@@ -140,6 +140,57 @@ describe("connection parameters on the URL", () => {
 });
 
 /**
+ * A transaction nobody finishes is ended by Postgres, and the pool carries on.
+ *
+ * On 11 November 2026 four sessions sat "idle in transaction" for six hours after a connection
+ * failed mid-transaction, and every signed-in request hung behind them (AP-127). The limit goes out
+ * with every connection the pool opens, so the database ends such a session itself.
+ */
+describe("a transaction left idle", () => {
+  test("gets a one minute limit unless DATABASE_URL names another", () => {
+    const base = "postgres://openbot:openbot@db.example.com:5432/openbot";
+
+    expect(addressOf(base).connection).toEqual({
+      idle_in_transaction_session_timeout: "60000",
+    });
+    expect(
+      addressOf(`${base}?idle_in_transaction_session_timeout=0`).connection,
+    ).toEqual({ idle_in_transaction_session_timeout: "0" });
+  });
+
+  test("is ended by Postgres, and the one pooled connection serves the next query", async () => {
+    const address = new URL(testDatabaseUrl());
+    address.searchParams.set("idle_in_transaction_session_timeout", "300");
+    const database = createDatabase(address.toString(), { max: 1 });
+
+    try {
+      // Opens a transaction, runs one statement, then never returns: the shape of the incident.
+      const abandoned = database.$client
+        .begin(async (transaction) => {
+          await transaction`select 1`;
+          await new Promise(() => {});
+        })
+        .then(
+          () => "finished",
+          (error: unknown) => String(error),
+        );
+
+      // Bun 1.4 passes on what Postgres said ("terminating connection due to idle-in-transaction
+      // timeout"); Bun 1.3 only says "Failed to read data". Either way the transaction is over.
+      await expect(abandoned).resolves.toMatch(
+        /idle-in-transaction timeout|Failed to read data/,
+      );
+      // With a pool of one, this would wait for ever if the session were still open.
+      const rows = await database.execute("select 42 as answer");
+      expect((rows as Array<{ answer: number }>)[0]?.answer).toBe(42);
+    } finally {
+      // Not awaited: Bun 1.3 never settles close() on a pool that has lost a connection this way.
+      void database.$client.close({ timeout: 0 });
+    }
+  });
+});
+
+/**
  * `sslmode` is a client setting, and Bun takes it as the `tls` option rather than reading it.
  *
  * It used to travel with `application_name` as a Postgres startup parameter. Postgres refuses that
@@ -158,7 +209,10 @@ describe("sslmode on the URL", () => {
 
   test("is not sent to Postgres, which refuses it as a parameter", () => {
     const options = addressOf(`${base}?sslmode=require&application_name=probe`);
-    expect(options.connection).toEqual({ application_name: "probe" });
+    expect(options.connection).toEqual({
+      idle_in_transaction_session_timeout: "60000",
+      application_name: "probe",
+    });
   });
 
   test("disable turns TLS off explicitly", () => {
@@ -175,7 +229,9 @@ describe("sslmode on the URL", () => {
       "1.4.0",
     );
     expect(options.tls).toEqual({ rejectUnauthorized: true, ca: caPem });
-    expect(options.connection).toBeUndefined();
+    expect(Object.keys(options.connection)).toEqual([
+      "idle_in_transaction_session_timeout",
+    ]);
   });
 
   test("verify-full without sslrootcert checks against the trusted roots", () => {
