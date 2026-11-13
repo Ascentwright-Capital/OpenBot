@@ -19,6 +19,7 @@
     "@better-auth/drizzle-adapter": "^1.7.1",
     "@better-auth/electron": "1.7.1",
     "@better-auth/expo": "1.7.1",
+    "@better-auth/oauth-provider": "1.7.1",
     "@better-auth/scim": "1.7.1",
     "@better-auth/sso": "^1.7.1",
     "@composio/core": "^0.18.1",

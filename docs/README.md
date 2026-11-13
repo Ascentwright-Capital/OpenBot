@@ -10,6 +10,7 @@ Start with the root [README](../README.md), then use these references:
 - [Approvals](approvals.md): which actions a Bot asks before, the order that decides it, and what an admin can close.
 - [Routines](routines.md): standing instructions a Bot runs on a schedule, the worker that fires them, and who they run as.
 - [Automatic Learning](automatic-learning.md): which Bots contribute conversations to a Learning container, and receive its published skills.
+- [Managing OpenBot from Claude](claude-mcp.md): the MCP endpoint at /api/mcp, how claude.ai and Claude Code sign in, and what each tool can do.
 - [Public-web research](web-research.md): search and page reading through Parallel, Exa or Firecrawl.
 - Plugins, one connector per page — what an administrator registers, what each person consents to, and what the failures mean:
   - [Composio](plugins/composio.md): a broker, and so a catalogue of apps rather than a single connector.

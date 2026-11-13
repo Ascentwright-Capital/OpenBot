@@ -14,6 +14,14 @@ import type { DeploymentConfig } from "../config";
 import type { Database } from "../db/client";
 import {
   accounts,
+  jwks,
+  oauthAccessTokens,
+  oauthClientAssertions,
+  oauthClientResources,
+  oauthClients,
+  oauthConsents,
+  oauthRefreshTokens,
+  oauthResources,
   scimConnectionBindings,
   scimGroupMembers,
   scimGroups,
@@ -23,6 +31,7 @@ import {
   scimUsers,
   sessions,
   ssoProviders,
+  userRoles,
   users,
   verifications,
 } from "../db/schema";
@@ -30,6 +39,7 @@ import { DOMAIN_REFUSAL_MESSAGE, emailDomainAllowed } from "./email-domain";
 import { encryptSsoConfig } from "./encrypt-sso-config";
 import { SIGN_OUT_UNFINISHED } from "./organization";
 import { applyConfiguredAdmin, isConfiguredAdmin, seedRole } from "./roles";
+import { oauthPlugins } from "./oauth";
 import { recordProvisioned, scimOptions } from "./scim";
 
 /** What a person sees when SSO is required and they tried another way in. */
@@ -266,6 +276,20 @@ export function createAuth(
      * here or they land with no role at all and the request guard refuses them with a 403, which
      * reads as a broken deployment rather than a first sign-in.
      */
+    /*
+     * OAuth for MCP clients: how Claude signs in to manage this deployment through /api/mcp.
+     * See oauth.ts for what a token grants and why registration is open.
+     */
+    ...oauthPlugins({
+      baseUrl: authConfig.baseUrl,
+      isAdmin: async (userId) =>
+        (
+          await database
+            .select({ role: userRoles.role })
+            .from(userRoles)
+            .where(eq(userRoles.userId, userId))
+        ).some((row) => row.role === "admin"),
+    }),
     sso({
       provisionUser: async ({ user }) => {
         await seedRole(
@@ -405,6 +429,15 @@ export function createAuth(
           scimProjectionGrants,
           scimGroups,
           scimGroupMembers,
+          oauthClients,
+          oauthResources,
+          oauthClientResources,
+          oauthRefreshTokens,
+          oauthAccessTokens,
+          oauthConsents,
+          oauthClientAssertions,
+          // The jwt plugin's model is `jwks`; with usePlural the adapter looks for `jwkss`.
+          jwkss: jwks,
         },
         // The SCIM plugin needs interactive transactions; nothing else here asked for them.
         transaction: Boolean(scimPluginOptions),

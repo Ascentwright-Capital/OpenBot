@@ -8,6 +8,21 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 
 ## Unreleased
 
+**Before upgrading.** Migration `0089_oauth_provider` adds the OAuth tables behind the new MCP
+endpoint (below), all empty. It creates only what is missing, so a database that already has them
+is left as it is. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the
+secret, delete the rows in `jwks`, and connected Claude clients sign in again.
+
+### Manage OpenBot from Claude
+
+OpenBot is now an MCP server at `/api/mcp`. Add it to claude.ai, the Claude app or Claude Code and
+Claude manages OpenBot as you: Bots, Team Bots and who they are shared with, the apps each Bot may
+use, and, for an admin, people, roles, capability switches and the audit trail. Claude signs in with
+OpenBot's own sign-in and you approve it on a consent screen, choosing whether it may only look or
+also change things. Every call runs through the same routes and checks as your browser, and the
+token works nowhere but `/api/mcp`. Only on a deployment that signs people in itself; see
+[Managing OpenBot from Claude](docs/claude-mcp.md).
+
 ## 1.0.2
 
 **Before upgrading.** No migrations run in this release: the database stays at

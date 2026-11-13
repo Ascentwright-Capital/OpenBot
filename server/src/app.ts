@@ -1,6 +1,7 @@
+import { randomBytes } from "node:crypto";
 import { MAX_IMAGE_BYTES } from "@openbot/shared/attachments";
 import type { WhatIfVocabulary } from "@openbot/shared/what-if";
-import type { Hono as HonoApp, MiddlewareHandler } from "hono";
+import type { Context, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "hono/bun";
@@ -51,11 +52,20 @@ import {
   type AppVariables,
   type AuthService,
   createRequireUser,
+  INTERNAL_CALL_HEADER,
+  type InternalBearer,
   type RoleRepository,
   requireAdmin,
 } from "./auth/guards";
+import {
+  createOAuthTokenVerifier,
+  MCP_PATH,
+  normalizeRegistration,
+  scopesAllow,
+} from "./auth/oauth";
 import type { IdentityProviderStore } from "./auth/identity-provider-store";
 import { desktopAuthPage } from "./auth/native-browser";
+import { createMcpHandler, protectedResourceMetadata } from "./mcp/server";
 import {
   type BotBrowserRouteDeps,
   createBotBrowser,
@@ -568,6 +578,14 @@ export function createApp(
   /** The GitHub sign-in callback, built by the caller; mounted behind requireUser ahead of /api/identity. */
   identityGithubCallback?: Hono<{ Variables: AppVariables }>,
   profileStore?: ProfileStore,
+  /**
+   * What `/api/mcp` needs to admit Claude: the signing keys its tokens are checked against, and the
+   * person a token names. Absent (or with no identity provider), there is no MCP endpoint.
+   */
+  oauth?: {
+    jwks: () => Promise<{ keys: unknown[] }>;
+    findPerson: InternalBearer["findPerson"];
+  },
 ) {
   const app = new Hono<{ Variables: AppVariables }>();
   // First, in every auth mode: a page from another website changes nothing here and opens no socket.
@@ -735,7 +753,10 @@ export function createApp(
             .catch(() => null)) as { providerId?: unknown } | null)
         : null;
 
-    const answer = await auth.handler(context.req.raw);
+    // MCP clients on the person's own machine register as the native apps they are. See oauth.ts.
+    const answer = await auth.handler(
+      await normalizeRegistration(context.req.raw),
+    );
 
     if (auditStore && eventType && answer.ok) {
       const session = await auth.api.getSession({
@@ -768,11 +789,90 @@ export function createApp(
   // One administrator, when nothing is configured to sign anybody in. Checked first, and only ever
   // true when there is no provider, so a configured deployment cannot fall back to it. Admitted only
   // from where that one person can be: see `singleUserRefusal`.
+  /*
+   * Claude's way in: OAuth tokens for /api/mcp, admitted on the routes only for calls that endpoint
+   * makes in memory, which carry this secret. Never configured in single-user mode, which has no
+   * sign-in for a token to come from.
+   */
+  const oauthBaseUrl = config.auth?.baseUrl;
+  const verifyOAuth =
+    !config.singleUser && auth && oauth && oauthBaseUrl
+      ? createOAuthTokenVerifier({ baseUrl: oauthBaseUrl, jwks: oauth.jwks })
+      : undefined;
+  const internalCallSecret = randomBytes(32).toString("base64url");
   const requireUser = config.singleUser
     ? createDevRequireUser(config.singleUserAccess)
     : auth && roleRepository
-      ? createRequireUser(auth, roleRepository)
+      ? createRequireUser(
+          auth,
+          roleRepository,
+          verifyOAuth && oauth
+            ? {
+                secret: internalCallSecret,
+                verify: verifyOAuth,
+                findPerson: oauth.findPerson,
+                allows: scopesAllow,
+              }
+            : undefined,
+        )
       : authenticationUnavailable;
+
+  if (verifyOAuth && auth && oauthBaseUrl) {
+    /*
+     * Discovery, at the root where MCP clients look for it (RFC 9728 and RFC 8414, with the path of
+     * the resource and of the issuer inserted after the well-known prefix), and at the bare prefix
+     * for clients that do not insert it. The authorization server's own document is Better Auth's,
+     * served from under /api/auth.
+     */
+    const resourceMetadata = (context: Context) =>
+      context.json(protectedResourceMetadata(oauthBaseUrl));
+    app.get(
+      `/.well-known/oauth-protected-resource${MCP_PATH}`,
+      resourceMetadata,
+    );
+    app.get("/.well-known/oauth-protected-resource", resourceMetadata);
+    for (const document of [
+      "oauth-authorization-server",
+      "openid-configuration",
+    ]) {
+      const serve = (context: Context) =>
+        auth.handler(
+          new Request(
+            new URL(`/api/auth/.well-known/${document}`, context.req.url),
+            { headers: context.req.raw.headers },
+          ),
+        );
+      app.get(`/.well-known/${document}/api/auth`, serve);
+      app.get(`/.well-known/${document}`, serve);
+    }
+
+    const mcp = createMcpHandler({
+      baseUrl: oauthBaseUrl,
+      verify: verifyOAuth,
+      version: "1",
+      callApi: (token, request) => {
+        const url = new URL(request.path, oauthBaseUrl);
+        for (const [key, value] of Object.entries(request.query ?? {})) {
+          url.searchParams.set(key, value);
+        }
+        const hasBody = request.body !== undefined && request.method !== "GET";
+        return Promise.resolve(
+          app.fetch(
+            new Request(url, {
+              method: request.method,
+              headers: {
+                authorization: `Bearer ${token}`,
+                [INTERNAL_CALL_HEADER]: internalCallSecret,
+                ...(hasBody ? { "content-type": "application/json" } : {}),
+              },
+              ...(hasBody ? { body: JSON.stringify(request.body) } : {}),
+            }),
+          ),
+        );
+      },
+    });
+    app.on(["GET", "POST", "DELETE"], MCP_PATH, mcp);
+  }
   // Enterprise controls: capability switches and the model allowlist in front of the routes they
   // govern, the admin screen's API, and the SCIM verbs the GET/POST auth handler above does not take.
   app.use("/api/*", createEnterpriseGate(requireUser));
