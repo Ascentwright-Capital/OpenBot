@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeRegistration, scopesAllow } from "../src/auth/oauth";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import {
+  createOAuthTokenVerifier,
+  mcpResource,
+  normalizeRegistration,
+  OAuthTokenError,
+  oauthIssuer,
+  scopesAllow,
+} from "../src/auth/oauth";
 import { reachable, TOOLS } from "../src/mcp/tools";
 
 const register = (body: unknown) =>
@@ -77,5 +85,80 @@ describe("tools", () => {
       }).method;
       expect(tool.access).toBe(method === "GET" ? "read" : "manage");
     }
+  });
+});
+
+/*
+ * What a refused token is allowed to say about itself on the audit trail: who it names and which
+ * client it was issued to, but only once this deployment's own signature on it has verified.
+ */
+describe("why a token was refused", async () => {
+  const BASE = "https://bot.test";
+  const ours = await generateKeyPair("EdDSA", { extractable: true });
+  const theirs = await generateKeyPair("EdDSA", { extractable: true });
+  const verify = createOAuthTokenVerifier({
+    baseUrl: BASE,
+    jwks: async () => ({
+      keys: [{ ...(await exportJWK(ours.publicKey)), kid: "k1", alg: "EdDSA" }],
+    }),
+  });
+  const mint = (
+    key: CryptoKey,
+    options: { audience?: string; expiresIn?: string | number } = {},
+  ) =>
+    new SignJWT({ scope: "openbot:manage", azp: "client-1" })
+      .setProtectedHeader({ alg: "EdDSA", kid: "k1" })
+      .setIssuer(oauthIssuer(BASE))
+      .setSubject("person-1")
+      .setAudience(options.audience ?? mcpResource(BASE))
+      .setIssuedAt()
+      .setExpirationTime(options.expiresIn ?? "1h")
+      .sign(key);
+  const refusal = async (token: string) => {
+    try {
+      await verify(token);
+    } catch (error) {
+      if (error instanceof OAuthTokenError) return error;
+      throw error;
+    }
+    throw new Error("expected a refusal");
+  };
+
+  test("a good token names its person, scopes and client", async () => {
+    expect(await verify(await mint(ours.privateKey))).toEqual({
+      userId: "person-1",
+      scopes: ["openbot:manage"],
+      clientId: "client-1",
+    });
+  });
+
+  test("an expired token is still one this deployment signed, so it says whose it was", async () => {
+    const error = await refusal(
+      await mint(ours.privateKey, {
+        expiresIn: Math.floor(Date.now() / 1000) - 60,
+      }),
+    );
+    expect(error.reason).toBe("expired");
+    expect(error.proven).toEqual({ userId: "person-1", clientId: "client-1" });
+  });
+
+  test("a token for another audience says so, and whose it was", async () => {
+    const error = await refusal(
+      await mint(ours.privateKey, { audience: "https://elsewhere.test" }),
+    );
+    expect(error.reason).toBe("wrong_audience");
+    expect(error.proven).toEqual({ userId: "person-1", clientId: "client-1" });
+  });
+
+  test("a token signed by anybody else proves nothing about anybody", async () => {
+    const error = await refusal(await mint(theirs.privateKey));
+    expect(error.reason).toBe("invalid");
+    expect(error.proven).toEqual({});
+  });
+
+  test("an opaque token proves nothing either", async () => {
+    const error = await refusal("not-a-jwt");
+    expect(error.reason).toBe("invalid");
+    expect(error.proven).toEqual({});
   });
 });

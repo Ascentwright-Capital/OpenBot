@@ -32,6 +32,8 @@ export const REFUSED_EVENT_TYPES = [
   "component.function_refused",
   "mcp.call_rejected",
   "mcp.callback_refused",
+  /** A token turned away where Claude manages OpenBot. The only trace that anybody tried. */
+  "mcp.token_refused",
   "routines.dispatch_refused",
   /*
    * A hop one Bot was not allowed to make. `server/src/audit.ts` calls this "the more important of

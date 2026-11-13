@@ -23,6 +23,12 @@ also change things. Every call runs through the same routes and checks as your b
 token works nowhere but `/api/mcp`. Only on a deployment that signs people in itself; see
 [Managing OpenBot from Claude](docs/claude-mcp.md).
 
+The audit trail says what came through Claude. A change made through `/api/mcp` names the OAuth
+client on its row (`oauthClient` in the payload, and "Through Claude Code" on the audit screen), so
+it can be told from the same change made in the browser. A token turned away there is now a row of
+its own, `mcp.token_refused`, with its reason, and with the person and the client when the token
+proves them. Never the token.
+
 ## 1.0.2
 
 **Before upgrading.** No migrations run in this release: the database stays at

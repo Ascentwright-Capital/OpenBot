@@ -62,6 +62,7 @@ import {
   MCP_PATH,
   normalizeRegistration,
   scopesAllow,
+  type TokenRefusal,
 } from "./auth/oauth";
 import type { IdentityProviderStore } from "./auth/identity-provider-store";
 import { desktopAuthPage } from "./auth/native-browser";
@@ -585,6 +586,8 @@ export function createApp(
   oauth?: {
     jwks: () => Promise<{ keys: unknown[] }>;
     findPerson: InternalBearer["findPerson"];
+    /** What an OAuth client called itself when it registered, for the audit trail. */
+    clientName?: InternalBearer["clientName"];
   },
 ) {
   const app = new Hono<{ Variables: AppVariables }>();
@@ -800,6 +803,48 @@ export function createApp(
       ? createOAuthTokenVerifier({ baseUrl: oauthBaseUrl, jwks: oauth.jwks })
       : undefined;
   const internalCallSecret = randomBytes(32).toString("base64url");
+  /*
+   * Every token turned away, at /api/mcp or by the guard behind it, on the trail with its reason.
+   * It names the person and the client only when the token proved them, and never holds the token.
+   * A write that fails is logged and the refusal stands: the caller is refused either way.
+   */
+  const recordTokenRefused = async (refusal: TokenRefusal) => {
+    if (!auditStore) return;
+    try {
+      const name = refusal.clientId
+        ? await oauth?.clientName?.(refusal.clientId)
+        : undefined;
+      await recordAuditEvent(auditStore, {
+        eventType: "mcp.token_refused",
+        targetType: "mcp_endpoint",
+        targetId: MCP_PATH,
+        ...(refusal.userId
+          ? { actorUserId: refusal.userId }
+          : { initiator: DEPLOYMENT_INITIATOR }),
+        payload: {
+          reason: refusal.reason,
+          method: refusal.method,
+          path: refusal.path,
+          ...(refusal.clientId
+            ? {
+                oauthClient: {
+                  id: refusal.clientId,
+                  ...(name ? { name } : {}),
+                },
+              }
+            : {}),
+        },
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          type: "mcp-token-refusal-audit-write-failed",
+          reason: refusal.reason,
+          error: String(error),
+        }),
+      );
+    }
+  };
   const requireUser = config.singleUser
     ? createDevRequireUser(config.singleUserAccess)
     : auth && roleRepository
@@ -812,6 +857,8 @@ export function createApp(
                 verify: verifyOAuth,
                 findPerson: oauth.findPerson,
                 allows: scopesAllow,
+                ...(oauth.clientName ? { clientName: oauth.clientName } : {}),
+                refused: recordTokenRefused,
               }
             : undefined,
         )
@@ -850,6 +897,7 @@ export function createApp(
       baseUrl: oauthBaseUrl,
       verify: verifyOAuth,
       version: "1",
+      refused: recordTokenRefused,
       callApi: (token, request) => {
         const url = new URL(request.path, oauthBaseUrl);
         for (const [key, value] of Object.entries(request.query ?? {})) {

@@ -167,6 +167,7 @@ import {
   channelMemberships,
   channels,
   intelligenceChannelMappings,
+  oauthClients,
   recorderConnections,
   users,
 } from "./db/schema";
@@ -3418,6 +3419,14 @@ const app = createApp(
     ? {
         jwks: () => betterAuth.api.getJwks() as Promise<{ keys: unknown[] }>,
         findPerson: (userId) => peopleStore.find(userId),
+        clientName: async (clientId) =>
+          (
+            await database
+              .select({ name: oauthClients.name })
+              .from(oauthClients)
+              .where(eq(oauthClients.clientId, clientId))
+              .limit(1)
+          )[0]?.name?.slice(0, 120) || undefined,
       }
     : undefined,
 );

@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
+import { withAuditOAuthClient } from "../audit";
 import type { Database } from "../db/client";
 import { userRoles } from "../db/schema";
+import { OAuthTokenError, type TokenRefusal } from "./oauth";
 import type { OpenBotRole } from "./roles";
 
 export type AuthenticatedActor = {
@@ -66,7 +68,9 @@ export const INTERNAL_CALL_HEADER = "x-openbot-mcp-call";
 export type InternalBearer = {
   secret: string;
   /** Who a verified token names, and with which scopes. Throws when it is not good. */
-  verify: (token: string) => Promise<{ userId: string; scopes: string[] }>;
+  verify: (
+    token: string,
+  ) => Promise<{ userId: string; scopes: string[]; clientId?: string }>;
   findPerson: (userId: string) => Promise<
     | {
         id: string;
@@ -79,6 +83,10 @@ export type InternalBearer = {
   >;
   /** Whether these scopes may make a request with this method. */
   allows: (scopes: readonly string[], method: string) => boolean;
+  /** What the OAuth client called itself when it registered, for the audit trail. */
+  clientName?: (clientId: string) => Promise<string | undefined>;
+  /** Told about every call refused here, so it reaches the audit trail. Must not throw. */
+  refused?: (refusal: TokenRefusal) => Promise<void>;
 };
 
 function bearerOf(context: Context) {
@@ -112,13 +120,29 @@ export function createRequireUser(
         internalBearer.secret,
       )
     ) {
-      let identity: { userId: string; scopes: string[] };
+      let identity: { userId: string; scopes: string[]; clientId?: string };
+      const refused = (refusal: Omit<TokenRefusal, "method" | "path">) =>
+        internalBearer.refused?.({
+          ...refusal,
+          method: context.req.method,
+          path: context.req.path,
+        });
       try {
         identity = await internalBearer.verify(token);
-      } catch {
+      } catch (error) {
+        await refused(
+          error instanceof OAuthTokenError
+            ? { reason: error.reason, ...error.proven }
+            : { reason: "invalid" },
+        );
         return context.json({ error: "Authentication required." }, 401);
       }
+      const proven = {
+        userId: identity.userId,
+        ...(identity.clientId ? { clientId: identity.clientId } : {}),
+      };
       if (!internalBearer.allows(identity.scopes, context.req.method)) {
+        await refused({ reason: "read_only", ...proven });
         return context.json(
           {
             error:
@@ -138,6 +162,10 @@ export function createRequireUser(
           ? "user"
           : undefined;
       if (!person || !role) {
+        await refused({
+          reason: !person || person.revoked ? "person_removed" : "no_role",
+          ...proven,
+        });
         return context.json({ error: "Authorization required." }, 403);
       }
       context.set("actor", {
@@ -147,7 +175,16 @@ export function createRequireUser(
         image: person.image,
         role,
       });
-      await next();
+      if (!identity.clientId) {
+        await next();
+        return;
+      }
+      // Every audit row written while this request is handled says which client it came through.
+      const name = await internalBearer.clientName?.(identity.clientId);
+      await withAuditOAuthClient(
+        { id: identity.clientId, ...(name ? { name } : {}) },
+        () => next(),
+      );
       return;
     }
 

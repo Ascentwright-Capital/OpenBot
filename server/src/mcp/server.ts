@@ -3,10 +3,12 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Context } from "hono";
 import {
   MCP_PATH,
+  type OAuthIdentity,
+  OAuthTokenError,
   OPENBOT_MANAGE_SCOPE,
   OPENBOT_READ_SCOPE,
-  type OAuthIdentity,
   oauthIssuer,
+  type TokenRefusal,
 } from "../auth/oauth";
 import { type ApiRequest, reachable, TOOLS } from "./tools";
 
@@ -31,6 +33,11 @@ export type McpDependencies = {
   /** Send a request to this app in memory as the token's person. */
   callApi: (token: string, request: ApiRequest) => Promise<Response>;
   version: string;
+  /**
+   * Told about every token this endpoint turns away, so the refusal reaches the audit trail.
+   * Awaited before the answer goes out. It must not throw: a refusal is still a refusal.
+   */
+  refused?: (refusal: TokenRefusal) => Promise<void>;
 };
 
 export function protectedResourceMetadataUrl(baseUrl: string) {
@@ -131,13 +138,25 @@ export function createMcpHandler(dependencies: McpDependencies) {
     const token = header.toLowerCase().startsWith("bearer ")
       ? header.slice(7).trim()
       : "";
+    const refused = (refusal: Omit<TokenRefusal, "method" | "path">) =>
+      dependencies.refused?.({
+        ...refusal,
+        method: context.req.method,
+        path: MCP_PATH,
+      });
     if (!token) {
+      await refused({ reason: "missing" });
       return challenge(context, dependencies.baseUrl, "Sign in to OpenBot.");
     }
     let identity: OAuthIdentity;
     try {
       identity = await dependencies.verify(token);
     } catch (error) {
+      await refused(
+        error instanceof OAuthTokenError
+          ? { reason: error.reason, ...error.proven }
+          : { reason: "invalid" },
+      );
       return challenge(
         context,
         dependencies.baseUrl,
@@ -148,6 +167,11 @@ export function createMcpHandler(dependencies: McpDependencies) {
       !identity.scopes.includes(OPENBOT_READ_SCOPE) &&
       !identity.scopes.includes(OPENBOT_MANAGE_SCOPE)
     ) {
+      await refused({
+        reason: "no_openbot_scope",
+        userId: identity.userId,
+        ...(identity.clientId ? { clientId: identity.clientId } : {}),
+      });
       context.header(
         "WWW-Authenticate",
         `Bearer error="insufficient_scope", scope="${OPENBOT_MANAGE_SCOPE}", resource_metadata="${protectedResourceMetadataUrl(dependencies.baseUrl)}"`,
