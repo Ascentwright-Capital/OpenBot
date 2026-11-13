@@ -162,6 +162,11 @@ export function WhoCell({
           nameFor={nameFor}
         />
       </div>
+      {throughText(event) ? (
+        <div className="text-muted-foreground text-xs">
+          {throughText(event)}
+        </div>
+      ) : null}
     </>
   );
 }
@@ -453,6 +458,26 @@ function initiatorKindOf(event: AuditEvent): string | undefined {
     (event.eventType === "component.published" &&
       typeof event.payload?.note === "string");
   return ownChange ? "deployment" : event.initiatorKind;
+}
+
+/** Longer than any honest client name, short enough that one cannot fill the cell. */
+const MAX_CLIENT_NAME = 60;
+
+/**
+ * The app a row was made through, when it was not the browser: "Through Claude Code".
+ *
+ * A change Claude makes for somebody is recorded as theirs, by the same route their browser uses,
+ * and the server marks the row with the OAuth client it came through. The name is what that client
+ * called itself when it registered, so it is shown as a label and nothing is decided by it. A row
+ * with a client and no name still says it was not the browser.
+ */
+export function throughText(event: AuditEvent): string {
+  const client = event.payload?.oauthClient;
+  if (!client || typeof client !== "object") return "";
+  const name = (client as { name?: unknown }).name;
+  return typeof name === "string" && name.trim()
+    ? `Through ${name.trim().slice(0, MAX_CLIENT_NAME)}`
+    : "Through a connected app";
 }
 
 /**
@@ -826,6 +851,11 @@ export function decisionDetails(
     typeof payload.refusal === "string"
   )
     lines.push(payload.refusal);
+  if (
+    event.eventType === "mcp.token_refused" &&
+    typeof payload.reason === "string"
+  )
+    lines.push(TOKEN_REFUSALS[payload.reason] ?? payload.reason);
   /*
    * Why the conversation went where it went, which is the whole reason the row is written. Without
    * it a routing row says "Allowed" and names nobody, which is indistinguishable from a row that
@@ -899,6 +929,7 @@ export function searchTextOf(
     hostText(event),
     botText(event, nameFor),
     startedByText(event, nameFor, deployment),
+    throughText(event),
     decisionText(event),
     decisionText(event, false),
     // Both ways a reason is said, as for the subject above.
@@ -1137,6 +1168,18 @@ export const OUTCOME_ROW: Record<AuditOutcome, string> = {
  * the difference between a deployment that narrowed on purpose, one that has never declared a skill,
  * and one whose selector could not be reached, and only the last is a fault.
  */
+/** Why a token was turned away where Claude manages OpenBot, by the reason the row records. */
+const TOKEN_REFUSALS: Record<string, string> = {
+  missing: "No sign-in was sent",
+  invalid: "OpenBot didn't issue this sign-in",
+  expired: "The sign-in had expired",
+  wrong_audience: "The sign-in was issued for something else",
+  no_openbot_scope: "The connection has no access to OpenBot",
+  read_only: "The connection can look, not change",
+  person_removed: "This person was removed from OpenBot",
+  no_role: "This person has no role in OpenBot",
+};
+
 const DISCOVERY_REASONS: Record<string, string> = {
   "under-floor": "Few enough tools to offer them all",
   "nothing-declared": "No skill declares any of these tools",
@@ -1201,6 +1244,8 @@ const DECISIONS: Record<string, string> = {
   "mcp.call_failed": "The server didn't answer",
   // Not "Blocked": nothing about the Bot was judged, because nothing proved which Bot it was.
   "mcp.callback_refused": "Couldn't confirm which Bot it was",
+  // Not "Blocked": no rule judged anything. The sign-in Claude sent was not accepted.
+  "mcp.token_refused": "Sign-in not accepted",
 
   // A request closed without an answer: asking was turned off, or a rule now allows it.
   "approval.withdrawn": "Withdrawn",

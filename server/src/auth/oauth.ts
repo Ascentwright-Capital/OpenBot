@@ -1,6 +1,6 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { jwt } from "better-auth/plugins";
-import { createLocalJWKSet, type JWTPayload, jwtVerify } from "jose";
+import { createLocalJWKSet, errors, type JWTPayload, jwtVerify } from "jose";
 
 /**
  * OpenBot as an OAuth authorization server, for exactly one resource: the MCP endpoint.
@@ -110,7 +110,54 @@ export type OAuthIdentity = {
   clientId: string | undefined;
 };
 
-export class OAuthTokenError extends Error {}
+/**
+ * Why a token presented to `/api/mcp` was turned away, as the audit trail records it.
+ *
+ * The first five are the endpoint's own (mcp/server.ts). The last three are the request guard's,
+ * for a token that was good and still could not make the call (auth/guards.ts).
+ */
+export type TokenRefusalReason =
+  | "missing"
+  | "invalid"
+  | "expired"
+  | "wrong_audience"
+  | "no_openbot_scope"
+  | "read_only"
+  | "person_removed"
+  | "no_role";
+
+/** One refusal, for the trail. Never the token. */
+export type TokenRefusal = {
+  reason: TokenRefusalReason;
+  /** Who the token names, only when this deployment's own signature on it verified. */
+  userId?: string;
+  /** The OAuth client the token was issued to, on the same condition. */
+  clientId?: string;
+  method: string;
+  path: string;
+};
+
+export class OAuthTokenError extends Error {
+  constructor(
+    message: string,
+    readonly reason: Extract<
+      TokenRefusalReason,
+      "invalid" | "expired" | "wrong_audience"
+    > = "invalid",
+    /** What the token says about itself, present only when its signature verified. */
+    readonly proven: { userId?: string; clientId?: string } = {},
+  ) {
+    super(message);
+  }
+}
+
+function clientOf(payload: JWTPayload): string | undefined {
+  return typeof payload.azp === "string"
+    ? payload.azp
+    : typeof payload.client_id === "string"
+      ? payload.client_id
+      : undefined;
+}
 
 /**
  * Check an access token presented to the MCP endpoint, locally.
@@ -137,22 +184,50 @@ export function createOAuthTokenVerifier(input: {
     let payload: JWTPayload;
     try {
       ({ payload } = await jwtVerify(token, keys, { issuer, audience }));
-    } catch {
-      throw new OAuthTokenError("This token is invalid or has expired.");
+    } catch (failure) {
+      /*
+       * jose checks the signature first and the claims after, and a claim failure carries the
+       * payload it read. So an expired token, or one for another audience, is still one this
+       * deployment signed, and who it names is known. Anything else proves nothing about anybody.
+       */
+      const claims =
+        failure instanceof errors.JWTExpired ||
+        failure instanceof errors.JWTClaimValidationFailed
+          ? failure
+          : undefined;
+      const proven = claims
+        ? {
+            ...(typeof claims.payload.sub === "string" && claims.payload.sub
+              ? { userId: claims.payload.sub }
+              : {}),
+            ...(clientOf(claims.payload)
+              ? { clientId: clientOf(claims.payload) }
+              : {}),
+          }
+        : {};
+      throw new OAuthTokenError(
+        "This token is invalid or has expired.",
+        failure instanceof errors.JWTExpired
+          ? "expired"
+          : claims?.claim === "aud"
+            ? "wrong_audience"
+            : "invalid",
+        proven,
+      );
     }
     if (typeof payload.sub !== "string" || !payload.sub) {
-      throw new OAuthTokenError("This token names nobody.");
+      const clientId = clientOf(payload);
+      throw new OAuthTokenError(
+        "This token names nobody.",
+        "invalid",
+        clientId ? { clientId } : {},
+      );
     }
     const scope = typeof payload.scope === "string" ? payload.scope : "";
     return {
       userId: payload.sub,
       scopes: scope.split(" ").filter(Boolean),
-      clientId:
-        typeof payload.azp === "string"
-          ? payload.azp
-          : typeof payload.client_id === "string"
-            ? payload.client_id
-            : undefined,
+      clientId: clientOf(payload),
     };
   };
 }

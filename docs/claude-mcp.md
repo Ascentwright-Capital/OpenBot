@@ -75,6 +75,31 @@ reach `/api/auth`, `/api/mcp`, `/api/events` or `/api/delivery/webhooks`.
   other route is ignored. A person who has been removed is refused on their next call.
 - App: `/sign` resumes the authorization after sign-in, and `/connect/consent` is the consent screen.
 
+## On the audit trail
+
+- Every change made through Claude is recorded as the person's, by the route that made it, and its
+  row carries `oauthClient` in the payload: the client's id and the name it registered under (for
+  example "Claude Code"). The audit screen shows it under who started the row ("Through Claude
+  Code"), and the CSV export has it in the payload column. The name is the client's own word for
+  itself, so read it as a label; the id is the registration.
+- Every token turned away writes `mcp.token_refused` with a `reason`, the method and the path:
+
+  | Reason             | What happened                                                       |
+  | ------------------ | ------------------------------------------------------------------- |
+  | `missing`          | No token was sent. A client's first request, before it signs in.    |
+  | `invalid`          | Not a token this deployment signed, or one that names nobody.       |
+  | `expired`          | A token this deployment signed, past its hour.                      |
+  | `wrong_audience`   | A token this deployment signed for something other than `/api/mcp`. |
+  | `no_openbot_scope` | A good token with neither OpenBot scope.                            |
+  | `read_only`        | A read connection asked to change something.                        |
+  | `person_removed`   | The person was removed, or no longer exists.                        |
+  | `no_role`          | The person has no role.                                             |
+
+  The row names the person and the client only when the token proves them, which is when this
+  deployment's own signature on it verifies. A forged token names nobody. The token is never
+  written. `missing` and `expired` are routine: a client is refused once before it signs in, and
+  once an hour before it refreshes.
+
 ## Limits and operations
 
 - Only deployments that sign people in themselves (Google, Microsoft, Okta, SSO). A deployment signed

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { currentApprovalContext } from "@openbot/toolkit/continuation";
 import type { AuditInitiator } from "@openbot/toolkit/initiator";
 import {
@@ -194,6 +195,18 @@ export const auditEventTypes = [
    * which tool it named, and why it was refused.
    */
   "mcp.callback_refused",
+  /*
+   * A token presented to `/api/mcp`, where Claude manages this deployment, was turned away.
+   *
+   * The same gap `mcp.callback_refused` closed for Bots, at the other door: a missing, bad, expired
+   * or wrong-audience token answered 401 or 403 and left nothing behind, so an administrator could
+   * not see that somebody had tried. `reason` says which it was.
+   *
+   * The row names a person and an OAuth client only when the token proves them: one this
+   * deployment signed, even if it has since expired or was issued for somewhere else. A token whose
+   * signature does not verify names nobody here, for the reason given above. Never the token.
+   */
+  "mcp.token_refused",
   /*
    * An administrator registered this deployment's OAuth client with a vendor.
    *
@@ -1001,6 +1014,33 @@ export function redactAuditPayload(value: unknown): unknown {
   );
 }
 
+/**
+ * The OAuth client a request came through, when it came through `/api/mcp` and not the browser.
+ *
+ * A change Claude makes for somebody runs the same route and writes the same row as their browser
+ * would, which is the point of that endpoint and also meant nobody could tell the two apart
+ * afterwards. Held for the length of the request, so every row written while it is handled carries
+ * `oauthClient` in its payload without each of the routes knowing how it was reached. Set only by
+ * the request guard, after the token has been verified (auth/guards.ts).
+ *
+ * `name` is what the client called itself when it registered, and registration is open: it is a
+ * label for a person reading the trail, not a proof. `id` is the registration it belongs to.
+ */
+export type AuditOAuthClient = { id: string; name?: string };
+
+const requestOAuthClient = new AsyncLocalStorage<AuditOAuthClient>();
+
+export function withAuditOAuthClient<T>(
+  client: AuditOAuthClient,
+  run: () => T,
+): T {
+  return requestOAuthClient.run(client, run);
+}
+
+export function currentAuditOAuthClient(): AuditOAuthClient | undefined {
+  return requestOAuthClient.getStore();
+}
+
 export async function recordAuditEvent(
   store: AuditStore,
   event: AuditEventInput,
@@ -1069,10 +1109,16 @@ export function addAuditTap(tap: AuditTap): () => void {
 export function createAuditStore(database: Database): AuditStore {
   return {
     insert: async ({ initiator, ...event }) => {
+      const oauthClient = currentAuditOAuthClient();
       const row = {
         ...event,
         ...initiatorColumns(initiator),
-        payload: redactAuditPayload(event.payload) as Record<string, unknown>,
+        payload: redactAuditPayload(
+          // A row that already names a client (a refused token) keeps the one it names.
+          oauthClient && event.payload.oauthClient === undefined
+            ? { ...event.payload, oauthClient }
+            : event.payload,
+        ) as Record<string, unknown>,
       };
       const [persisted] = await database
         .insert(auditEvents)
