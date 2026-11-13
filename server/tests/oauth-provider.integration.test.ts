@@ -397,7 +397,10 @@ describe("the audit trail", () => {
     expect(rows.length).toBe(before + 1);
     // What an unverified token says about itself is a claim, and is not written down.
     expect(rows[0]?.actorUserId).toBeNull();
-    expect(rows[0]?.payload.oauthClient).toBeUndefined();
+    expect(Object.keys(rows[0]?.payload ?? {})).toEqual(
+      expect.arrayContaining(["reason", "method", "path"]),
+    );
+    expect(Object.keys(rows[0]?.payload ?? {})).not.toContain("oauthClient");
     expect(JSON.stringify(rows[0])).not.toContain("forged-signature");
     expect(JSON.stringify(rows[0])).not.toContain("claimed-client");
   });
@@ -521,6 +524,7 @@ describe("the audit trail", () => {
         ),
       );
     expect(row?.actorUserId).toBe(person.id);
-    expect(row?.payload.oauthClient).toBeUndefined();
+    expect(Object.keys(row?.payload ?? {})).not.toHaveLength(0);
+    expect(Object.keys(row?.payload ?? {})).not.toContain("oauthClient");
   });
 });
