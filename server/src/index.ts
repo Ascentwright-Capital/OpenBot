@@ -3414,6 +3414,12 @@ const app = createApp(
   identityStore,
   identityGithubCallback,
   profileStore,
+  betterAuth
+    ? {
+        jwks: () => betterAuth.api.getJwks() as Promise<{ keys: unknown[] }>,
+        findPerson: (userId) => peopleStore.find(userId),
+      }
+    : undefined,
 );
 
 startHttpServer({
