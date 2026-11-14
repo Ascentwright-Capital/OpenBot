@@ -376,7 +376,7 @@ export class PlanModel implements PlanLanguageModel {
                       id: event.messageId,
                     });
                     break;
-                  case "TOOL_CALL_START":
+                  case "TOOL_CALL_START": {
                     if (!names.has(event.toolCallName)) {
                       /*
                        * Claude sometimes calls a granted tool without the harness's `mcp__ag_ui__`
@@ -410,6 +410,7 @@ export class PlanModel implements PlanLanguageModel {
                       toolName: name,
                     });
                     break;
+                  }
                   case "TOOL_CALL_ARGS": {
                     if (skipped.has(event.toolCallId)) break;
                     const call = calls.get(event.toolCallId);

@@ -733,7 +733,9 @@ test("a shared thread asks for its own conversation; a direct message does not",
     key: "slack-thread-1",
     title: "plan the week",
   });
-  expect(conversed[1]?.thread).toBeUndefined();
+  const direct = conversed[1];
+  if (!direct) throw new Error("the direct message never reached converse");
+  expect(direct.thread).toBeUndefined();
 });
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();
