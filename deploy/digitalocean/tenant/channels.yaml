@@ -80,3 +80,33 @@ channels:
     description: "Nusa Auto content, Google Maps and reviews, WhatsApp, Instagram/TikTok and local ads."
     permitted_agents: [marketing]
     allowed_groups: [all]
+  - id: nusa-auto-commercial
+    name: 02-50-nusa-auto-commercial
+    description: "Nusa Auto prices, plans, subscriptions and promotions: answers from the price book, proposals for Arthur."
+    permitted_agents: [nusa-auto-commercial]
+    allowed_groups: [all]
+  - id: cilook-director
+    name: 03-00-cilook-director
+    description: "Anything Cilook: status, priorities, and hand-offs to the Cilook team."
+    permitted_agents: [cilook-director]
+    allowed_groups: [all]
+  - id: cilook-marketing
+    name: 03-40-cilook-marketing
+    description: "Cilook content, social, deposit page words and messages to families, as drafts for approval."
+    permitted_agents: [cilook-marketing]
+    allowed_groups: [all]
+  - id: cilook-product
+    name: 03-60-cilook-product
+    description: "Cilook features, backlog, specs and experiments."
+    permitted_agents: [cilook-product]
+    allowed_groups: [all]
+  - id: cilook-pilot-ops
+    name: 03-61-cilook-pilot-ops
+    description: "Cilook pilot homes, consent, schedules, nanny onboarding and the issue log."
+    permitted_agents: [cilook-pilot-ops]
+    allowed_groups: [all]
+  - id: cilook-research
+    name: 03-62-cilook-research
+    description: "Evidence, regulation and market research for Cilook, with sources."
+    permitted_agents: [cilook-research]
+    allowed_groups: [all]
