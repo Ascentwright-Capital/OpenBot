@@ -1,47 +1,32 @@
 # One starting conversation per coworker on the web, named like its Slack channel.
 channels:
   - id: front-desk
-    name: 00-factory-master
+    name: 00-00-factory-master
     description: "Start here: ask the factory anything. 00 Factory Master hands it to the right coworker."
     permitted_agents: [orchestrator]
     allowed_groups: [all]
-  - id: recruitment
-    name: 00-recruitment
-    description: "Job descriptions, CV screening, onboarding and reviews."
-    permitted_agents: [recruitment]
-    allowed_groups: [all]
   - id: strategy-pitch
-    name: 00-strategy-pitch
+    name: 00-10-strategy-pitch
     description: "Pitches, one-pagers, key messages, fundraising; finding researchers and advisers."
     permitted_agents: [strategy-pitch]
     allowed_groups: [all]
-  - id: aw-memory
-    name: 00-aw-memory
-    description: "Meeting notes in, decisions and action items out; ask what was decided."
-    permitted_agents: [aw-memory]
-    allowed_groups: [all]
-  - id: software-factory
-    name: 00-digital-factory
-    description: "Code changes as pull requests from a Linear issue; requests for new or changed coworkers."
-    permitted_agents: [software-factory]
+  - id: recruitment
+    name: 00-20-recruitment
+    description: "Job descriptions, CV screening, onboarding and reviews."
+    permitted_agents: [recruitment]
     allowed_groups: [all]
   - id: cto
-    name: 00-cto
+    name: 00-30-cto
     description: "Changes to ascentwright.com and tech questions for the holding."
     permitted_agents: [cto]
     allowed_groups: [all]
-  - id: adiruang-cto
-    name: 01-adiruang-cto
-    description: "Changes to the Adiruang website, including the consultation booking."
-    permitted_agents: [adiruang-cto]
-    allowed_groups: [all]
-  - id: nusa-auto-cto
-    name: 02-nusa-auto-cto
-    description: "Questions and small changes for the Nusa Auto app."
-    permitted_agents: [nusa-auto-cto]
+  - id: software-factory
+    name: 00-31-digital-factory
+    description: "Code changes as pull requests from a Linear issue; requests for new or changed coworkers."
+    permitted_agents: [software-factory]
     allowed_groups: [all]
   - id: analytics
-    name: 00-analytics
+    name: 00-32-analytics
     description: "Questions answered with data, read-only."
     permitted_agents: [analytics]
     allowed_groups: [all]
@@ -75,8 +60,23 @@ channels:
     description: "Marketing KPIs, measurement plans, reports and test readouts."
     permitted_agents: [marketing-performance]
     allowed_groups: [all]
+  - id: aw-memory
+    name: 00-90-aw-memory
+    description: "Meeting notes in, decisions and action items out; ask what was decided."
+    permitted_agents: [aw-memory]
+    allowed_groups: [all]
+  - id: adiruang-cto
+    name: 01-30-adiruang-cto
+    description: "Changes to the Adiruang website, including the consultation booking."
+    permitted_agents: [adiruang-cto]
+    allowed_groups: [all]
+  - id: nusa-auto-cto
+    name: 02-30-nusa-auto-cto
+    description: "Questions and small changes for the Nusa Auto app."
+    permitted_agents: [nusa-auto-cto]
+    allowed_groups: [all]
   - id: marketing
-    name: 02-nusa-auto-marketing
+    name: 02-40-nusa-auto-marketing
     description: "Nusa Auto content, Google Maps and reviews, WhatsApp, Instagram/TikTok and local ads."
     permitted_agents: [marketing]
     allowed_groups: [all]

@@ -6,7 +6,7 @@ deployment with `git pull` and `docker compose --env-file .env up -d`.
 
 | File | What it holds |
 | --- | --- |
-| `agents.yaml` | The coworkers, named `NN Name` to match their Slack channel `#nn-name`. Lineup and roles: the Linear document "Coworker roles v2" (AP-106). |
+| `agents.yaml` | The coworkers, named `CC-DS Name` (company, department, seat) to match their Slack channel `#cc-ds-name`. Lineup and roles: the Linear document "Coworker roles v2" (AP-106). |
 | `channels.yaml` | One starting conversation per coworker, named like its Slack channel. |
 | `skills.yaml` | Copied from `examples/fintech`, unchanged, so `bot-creator` and `skill-creator` exist. |
 | `model.yaml` | Copied unchanged. With `CLAUDE_CODE_OAUTH_TOKEN` set, built-in Bots run on the Claude plan through the harness and this file's model is not used. |
