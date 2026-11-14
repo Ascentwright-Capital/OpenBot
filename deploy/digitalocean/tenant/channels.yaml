@@ -45,6 +45,36 @@ channels:
     description: "Questions answered with data, read-only."
     permitted_agents: [analytics]
     allowed_groups: [all]
+  - id: marketing-director
+    name: 00-40-marketing-director
+    description: "Any marketing request, for any company: the director briefs the marketing team and gives one answer."
+    permitted_agents: [marketing-director]
+    allowed_groups: [all]
+  - id: marketing-research
+    name: 00-41-marketing-research-insights
+    description: "Market, customer and competitor research, with sources."
+    permitted_agents: [marketing-research]
+    allowed_groups: [all]
+  - id: marketing-strategy
+    name: 00-42-marketing-strategy-planning
+    description: "Positioning, marketing plans, budget options, calendars and campaign briefs."
+    permitted_agents: [marketing-strategy]
+    allowed_groups: [all]
+  - id: marketing-content
+    name: 00-43-marketing-brand-content
+    description: "Brand voice, posts, copy, scripts and creative briefs, as drafts for approval."
+    permitted_agents: [marketing-content]
+    allowed_groups: [all]
+  - id: marketing-channels
+    name: 00-44-marketing-channels-growth
+    description: "Google Maps and search, social, ads, WhatsApp and partnerships: channel plans."
+    permitted_agents: [marketing-channels]
+    allowed_groups: [all]
+  - id: marketing-performance
+    name: 00-45-marketing-performance-reporting
+    description: "Marketing KPIs, measurement plans, reports and test readouts."
+    permitted_agents: [marketing-performance]
+    allowed_groups: [all]
   - id: marketing
     name: 02-nusa-auto-marketing
     description: "Nusa Auto content, Google Maps and reviews, WhatsApp, Instagram/TikTok and local ads."
