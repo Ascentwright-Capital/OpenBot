@@ -98,6 +98,17 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
 Check it from a real account: a mention gets a reply, a follow-up in that thread gets a reply, an
 unmentioned message in a new conversation gets silence.
 
+**Always tag @Factory, in a direct message too.** This is deliberate: @Factory answers a message
+only when it is tagged, or when the message is a reply in a thread it already answers in. A direct
+message without the tag gets no reply and no notice, and never reaches OpenBot. Start the direct
+message with `@Factory`; replies in that thread then work without the tag.
+
+**Link to the shared front desk, not a copy.** Connect from the page of the built-in front desk
+Bot (`orchestrator`, shown as "00 Factory Master"). A private Bot with a similar name has none of
+its apps or coworkers, so @Factory would answer but say it has no Linear tools and nobody to hand
+work to. **Reaching you** shows which Bot an account is linked to; connecting again from the right
+page moves the link.
+
 **Where answers go.** In a direct message with @Factory, the answer comes back in the DM. In a
 channel thread, with `OPENTAG_ANSWER_IN_CHANNELS=true` (our setting), the coworker answers in that
 thread for everyone there to read; approval requests show there as Approve/Deny buttons only the asker can press. With it off,

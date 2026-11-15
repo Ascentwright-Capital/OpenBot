@@ -232,3 +232,376 @@ skills:
       save_bot once, at the end. It is not a way to show a draft: it puts a card in front of the
       person and nothing is created unless they press the button.
     tools: []
+
+  # Tailored skills (AP-144). One per job, granted to the coworkers that do that job (agents.yaml
+  # `skills:`). The same text is copied into each coworker's system_prompt under "Your skills", because
+  # a built-in coworker only sees a skill's instruction when a person types its `/` command on the web.
+  # Change the text here and rerun the generator so both stay in step. No tools declared: tool
+  # narrowing stays off and Linear stays offered on every run.
+  - slug: hand-over-a-request
+    title: "Hand a request to a coworker"
+    summary: "Package a request so the coworker it goes to never has to ask again."
+    instructions: |-
+      Use for every hand-over, after the routing rules in your role have picked the coworker.
+      1. Write the hand-over packet: request in the person's own words; company (00, 01, 02, 03, 04); outcome wanted; deadline; links and files; what was already said in the thread; who asked.
+      2. Several parts: one packet per coworker, and say who does what.
+      3. Post in the thread: line 1 "<CC-DS Name> is on this"; then the result with links when it comes back.
+      4. If the person used #00-00-factory-master or a direct message for one coworker's job, add one line: the channel or the prefix to use next time.
+      5. Never approve, publish or decide on anyone's behalf.
+    tools: []
+  - slug: write-pitch-material
+    title: "Write pitch or partner material"
+    summary: "Draft a pitch, one-pager, intro or slide text from the approved key messages."
+    instructions: |-
+      1. Settle the reader (investor, partner, recruit, customer) and the one action they should take after reading; ask only if it is not obvious.
+      2. Build from KB 02 word for word (one-liners, company rows); story and design rules from KB 03; investor framing from KB 04. Cilook: KB 14 approved lines and wording rules, facts from KB 16.
+      3. Every figure, customer, milestone and name comes from a KB, Linear or the person. Missing: leave "[to confirm: what, who]". Never estimate.
+      4. Run the "before external use" lists in KB 02 and KB 03 and list what applies under the draft.
+      5. Output: the draft first, then "Needs Arthur's OK", then "Gaps". Numbers as mn / bn. You draft; a person sends.
+    tools: []
+  - slug: investor-research
+    title: "Research investors and why-now"
+    summary: "Build investor map rows, why-now entries and question banks for a raise."
+    instructions: |-
+      Method from KB 04 (fundraising playbook).
+      1. Investor map row: fund, stage, cheque size, sector fit, Indonesia/SEA activity, a relevant portfolio company, warm route (only from KB 05 or the person), source link and date checked.
+      2. Why-now entry: the change (regulation, technology, behaviour, market), the evidence with source and date, what it unlocks for our company, the risk if we wait.
+      3. Question bank: the 10 questions this investor type asks most, with our current answer or "[gap]".
+      4. Mark anything older than 6 months "to re-check". Never invent a fund's terms or a contact.
+    tools: []
+  - slug: scout-researchers
+    title: "Scout researchers and advisers"
+    summary: "Find and verify researchers, professors and labs as advisers or co-founders."
+    instructions: |-
+      Method from KB 10.
+      1. Confirm the need: venture, topic, role (adviser, co-founder, research partner), place (MIT/Boston by default).
+      2. For each person: name, current role and lab verified on an official page (link and date), 2-3 relevant works, why they fit, confidence (high / medium / low) with the reason.
+      3. Contact route: official email shown on their page, lab administrator, or a warm route from KB 05. Never construct an email address.
+      4. Rank the top 3 and draft a short outreach note for each, marked "Draft, Arthur sends".
+    tools: []
+  - slug: write-a-jd
+    title: "Write a job description"
+    summary: "Turn a role need into a JD, weighted scorecard and sourcing brief, in English and Bahasa."
+    instructions: |-
+      Method from KB 07.
+      1. Intake: company, role, why now, outcomes in 30/90/180 days, must-haves vs nice-to-haves, location and time commitment. Ask once for what is missing.
+      2. Write the JD: company paragraph word for word from KB 02, the role's outcomes first, then responsibilities and requirements. Bahasa Indonesia version beside it.
+      3. Weighted scorecard: 5-7 criteria, weights adding to 100, what a 1, 3 and 5 looks like for each.
+      4. Sourcing brief: where to look, search strings, screening questions.
+      5. Leave pay out: "Compensation: Arthur handles directly".
+    tools: []
+  - slug: score-candidates
+    title: "Score candidates"
+    summary: "Score CVs, work samples and interview notes against the scorecard and rank them."
+    instructions: |-
+      Method from KB 08.
+      1. Use the role's scorecard; if there is none, write it first (/write-a-jd) and ask Arthur to confirm.
+      2. For each candidate and criterion: quote the evidence first (CV line, sample, interview note), then the score 1-5. No evidence = no score, write "not shown".
+      3. Rank with the weighted total, state the gap between candidates and the biggest risk for each.
+      4. Recommend next step per candidate (interview, work test, decline). Never compare on pay, age, religion, ethnicity, gender or family status.
+    tools: []
+  - slug: onboard-and-review
+    title: "Onboarding and reviews"
+    summary: "Write 30/60/90 plans, check-ins and probation or performance reviews."
+    instructions: |-
+      Method from KB 09.
+      1. Accepted offer or start date: a 30/60/90 plan with 3-5 outcomes each, a buddy, tools and access to request, and the first-week calendar.
+      2. Check-ins: what was planned, what happened, blockers, next two weeks.
+      3. Probation end or review: evidence against the plan and the AscentWright Leadership Development Model, a rating proposal, development actions. Mark it "proposed: Arthur decides".
+      4. No pay, contract terms or personal data in what you write: Arthur handles those directly.
+    tools: []
+  - slug: make-a-site-change
+    title: "Make a website or app change"
+    summary: "Turn a request into a Linear issue, a branch and a pull request with a preview link."
+    instructions: |-
+      1. Issue: find or draft the Linear issue in the company's project (title, why, done when; label Website for site work). Ask the person to confirm a drafted one.
+      2. Read the repository's AGENTS.md and README, then KB 11 for owners and standing rules.
+      3. Plan in the thread: files, what the person will see, how you will test. Wait for "go" unless it is a text or image fix.
+      4. Branch type/ap-number-slug; titles "[Type] Summary (AP-n)"; no AI credit lines.
+      5. Run every check the repository lists; open the pull request with results and the preview link; post the link. Never push to main or merge: Ken reviews and merges.
+      6. If your GitHub tools only read: put the exact change (file, old text, new text, both languages) in the Linear issue and say a person must apply it.
+    tools: []
+  - slug: answer-from-the-code
+    title: "Answer how something works"
+    summary: "Answer a question about a site or app from the code and the Linear specs, with file references."
+    instructions: |-
+      1. Find the answer in the repository (read the files, not just names) and in the Linear specs and Decision log of the company's project.
+      2. Answer first in plain words, then "Where": file paths and line ranges, Linear IDs.
+      3. If code and spec disagree, show both and say which one runs today.
+      4. If you cannot read it, say what you could not reach and who can (Ken for code and hosting).
+    tools: []
+  - slug: nusa-auto-price-lookup
+    title: "Look up a Nusa Auto price"
+    summary: "Quote a Nusa Auto price or plan from the price book with its version and status."
+    instructions: |-
+      1. Read KB 15 Part 1 (price book). Quote the exact row: price, what it includes, window, band.
+      2. Always add the version (v1.1, 5 Nov 2026) and the status: hypothesis, proposed or approved. Only approved rows may go public.
+      3. Not in the book, or from a retired catalogue (KB 15 section 9): say so and never quote it. A change or a new price goes to 02-50 Nusa Auto Commercial.
+    tools: []
+  - slug: request-a-coworker
+    title: "Request a new or changed coworker"
+    summary: "Write a request for a new or changed bot as a Linear issue for Arthur and Ken."
+    instructions: |-
+      1. Capture: company and department (CC-DS code from Coworker roles v2), name, what it does and must never do, Slack channel #cc-ds-name, KB documents it reads, skills, tools (Linear, GitHub read/write, browser), hand-offs, human owner.
+      2. Check Coworker roles v2: is the seat already defined or "to build"? Reuse its code.
+      3. File it in Linear project 00 AscentWright Digital Factory (P-AP-5) with that content and a test: two example requests and the answer you expect.
+      4. Tell the person Arthur (via Claude) builds bot changes and Ken reviews tools and access (D-73).
+    tools: []
+  - slug: answer-with-data
+    title: "Answer with data"
+    summary: "Answer a numbers question with the source, the calculation and a confidence level."
+    instructions: |-
+      1. Restate the question as a metric, a period and a scope (company, site, channel).
+      2. Find the data: Linear, KB documents, files the person gives. Name each source with its date.
+      3. Answer: the number first, then the inputs and arithmetic, then confidence (high / medium / low) and why.
+      4. Keep targets and plans apart from results. Missing data: say exactly what is missing and who has it. Never fill a gap with an estimate unless asked, and then label it "estimate" with the assumptions.
+    tools: []
+  - slug: marketing-brief
+    title: "Write a marketing brief"
+    summary: "Turn any marketing request into a six-line brief and split the work across the team."
+    instructions: |-
+      1. Brief: company, audience, objective, KPI, budget (never assume one), deadline and deliverable.
+      2. Small request: give it to one associate or do it yourself. Larger: insight (00-41) → plan (00-42) → content (00-43) → channels (00-44) → measurement (00-45), skipping steps already in Linear.
+      3. Pick the method: Maps, content, WhatsApp or weekly report from KB 13; Cilook from KB 14; Nusa Auto prices from KB 15 (read only).
+      4. Check before it goes back: answers the brief, matches KB 02 (Cilook: KB 14), every number sourced or "to confirm", nothing published or spent.
+      5. Report: recommendation, a table (what, channel, owner, date, KPI), what needs approval, what is missing.
+    tools: []
+  - slug: market-research
+    title: "Market and competitor research"
+    summary: "Research a market, customer or competitor question with sources and dates."
+    instructions: |-
+      1. Question → what decision it informs.
+      2. Sources: official and primary first, then reputable reports, then reviews and social. Open every source you cite; date and link each figure.
+      3. Competitors: name, offer, price with date and link, channels, rating, what customers praise and complain about, what it means for us.
+      4. Customers: who, job to be done, pains, triggers, where they look; quotes only from real sources.
+      5. Output: three key insights first, then the evidence table, then limits and what to verify next.
+    tools: []
+  - slug: marketing-plan
+    title: "Make a marketing plan"
+    summary: "Positioning, channel mix, budget options and a calendar for one company."
+    instructions: |-
+      1. Positioning in five lines: segment, problem, our answer, proof, why us. Messages from KB 02 word for word (Cilook: KB 14).
+      2. Channel mix with the role of each channel and the method from KB 13.
+      3. Three budget options (lean / base / push) with what each buys and the KPI it should move; never assume a budget is approved.
+      4. Calendar by week: what, channel, owner, KPI. Every promotion has an end date, a cap and a measure (Nusa Auto prices only from KB 15).
+      5. File as a Linear document in the company's project when asked.
+    tools: []
+  - slug: maps-local-search
+    title: "Google Maps and local search"
+    summary: "Check a Google Business Profile, plan photos and posts, and draft review requests and replies."
+    instructions: |-
+      Method KB 13 section A.
+      1. Listing check as a table (field, current, proposed, who fixes): name as on signage, categories, address and pin, phone or WhatsApp, hours incl. holidays, link, services with approved prices only, attributes.
+      2. Photos: at least 10 real ones before launch; impressions of unbuilt sites never go on Maps.
+      3. Reviews: same request to every customer at the moment of delight, no rewards; reply within 48 h (positive: thank, name the service, invite back; negative: apologise, move to WhatsApp with a named person, no personal data).
+      4. One Google post a week. Local search: 10 phrases people nearby type, where we and 3 competitors rank, fixes.
+      5. Monthly measures: views, calls, directions, clicks, reviews, rating, reply time.
+    tools: []
+  - slug: content-social
+    title: "Content and social posts"
+    summary: "Plan pillars and a content calendar, and draft posts, captions and short-video scripts."
+    instructions: |-
+      Method KB 13 section B.
+      1. Pillars: 3-5 per brand, each with who it is for and what it proves.
+      2. Calendar (Linear document): date, pillar, format, hook, caption, call to action, owner, status. Start with 3 posts and 3 short videos a week.
+      3. Each piece: hook in the first 2 seconds or line, one message, real footage, a call to action that matches the objective; caption first line works alone, 2-4 short lines, 3-5 hashtags. Give 2-3 variants and pick one.
+      4. Video scripts as a table: time, shot, on-screen text, voice-over; under 30 s.
+      5. Bahasa Indonesia for customers. Cilook: run /cilook-brand-check before handing over. Mark "Draft, needs approval from <owner>".
+    tools: []
+  - slug: whatsapp-crm
+    title: "WhatsApp and CRM"
+    summary: "Plan consent-based WhatsApp broadcasts and journeys, and draft templates."
+    instructions: |-
+      Method KB 13 section C.
+      1. Consent: only people who gave this company their number for this purpose; record where and when; every broadcast ends with how to stop ("Balas STOP").
+      2. Cost line in every plan: business-sent messages cost about Rp 357-390 each (verify before budgeting).
+      3. Segment (lead, first-time, member, lapsed; product; area); never one blast to everyone.
+      4. Templates: utility or marketing, greeting with name, one message, one button or link, stop line. Max one marketing message a week per person.
+      5. Journeys: welcome (day 0/3/7), reminder, win-back (30/60 days), review request.
+      6. Measures: delivered, read, replied, clicked, converted, opt-outs; stop a template above 2% opt-outs. No sensitive data in the CRM.
+    tools: []
+  - slug: weekly-marketing-report
+    title: "Weekly marketing report"
+    summary: "Write the Monday one-page marketing report for one company."
+    instructions: |-
+      Method KB 13 section D. For Monday-Sunday last week, a Linear document "Marketing weekly <company> <yyyy-ww>":
+      1. Headline: what moved and why, one sentence.
+      2. KPI table: this week, last week, 4-week average, target; the company's funnel plus a line per channel (Maps, Instagram, TikTok, WhatsApp, ads spend and cost per result).
+      3. What worked and what did not, each with the post, template or campaign as evidence.
+      4. Three actions for this week with owner and the KPI each should move.
+      5. Data gaps: "n/a: <who supplies it>". Never invent an actual; before launch report readiness instead.
+    tools: []
+  - slug: cilook-brand-check
+    title: "Cilook brand and claims check"
+    summary: "Check any Cilook words or visuals against the brand pack before they leave the company."
+    instructions: |-
+      Read KB 14, then check every line of the draft:
+      1. Names: Cilook (never Claire); Chelsea; Kristoforus Adhitya in full where named. Approved lines from KB 14 section 2 used word for word.
+      2. Hard rules: "parents and guardians"; "nanny or babysitter"; "specialist" not doctor or professor; no diagnose, score, "on track", milestone checks, growth charts or "monitor/pemantauan"; "automates" = Cilook drafts, parents approve; launching, not live; no fear marketing; no unverified statistics; no processed food or brands; no faith content; children's photos only with written consent.
+      3. Look: no chosen colour or logo yet, so describe visuals as "to be confirmed".
+      4. Output: pass, or each failing line with the rule broken and a fixed line. Approval: Arthur; social with Chelsea.
+    tools: []
+  - slug: nusa-auto-price-proposal
+    title: "Propose a Nusa Auto price change"
+    summary: "One-page proposal for a price, plan, discount or promotion, with the economics by window."
+    instructions: |-
+      KB 15 Part 2, job B.
+      1. What changes and why now.
+      2. Economics by window (off / wdp / we): contribution per bay-minute; net per member = fee + top-ups + extras - washer fee - consumables (Rp 12-23k) - pick-up - walk-ins pushed out; cannibalisation; effect on monthly EBITDA and payback. Show inputs.
+      3. Guardrail check, each pass/fail: no unlimited plan; extra washes at or above the floors (weekday morning 20/25/30k, weekend 45-60k); discount over 10% needs Arthur; no price war; Hidrolik ceiling ~Rp 70k; no consumer pick-up at launch; weekend caps.
+      4. The test that validates it, with a decision rule.
+      5. Systems that must change. End with the decision Arthur must make and your recommendation.
+    tools: []
+  - slug: nusa-auto-subscriptions
+    title: "Manage Nusa Auto subscriptions"
+    summary: "Member caps, redemptions, churn, notice rules and window pricing for plans."
+    instructions: |-
+      KB 15 Part 2, jobs C and D.
+      1. Track per plan: members vs cap, redemptions vs quota, breakage, weekend share of member washes, cannibalisation ("where did you wash last?"), churn and failed payments. No data: say what is needed from whom.
+      2. Price change for existing members: 30 days' notice and the member's consent (D-49, D-64); monthly members from next month, yearly at renewal.
+      3. Optimise: window prices and extra-wash prices, Good-Better-Best bundles, add-ons only in the finishing lane, promotions with end date, cap and measure, A/B tests with stop rules, large-vehicle surcharge only for large SUV, premium MPV, double cab.
+      4. Yearly billing only once redemption data exists.
+    tools: []
+  - slug: nusa-auto-competitor-watch
+    title: "Nusa Auto competitor watch"
+    summary: "Monthly check of competitor prices and plans within 3 km."
+    instructions: |-
+      KB 15 Part 2, job E.
+      1. Squicky Deplu plus 3 washes within 3 km of Pesanggrahan.
+      2. For each: price board by service and size, plans, Google rating and review count, visible changes since last month. Date and link every price; mark anything not seen first-hand.
+      3. Log the changes and the implication for our book in a Linear document in "02 Nusa Auto"; propose a change only through /nusa-auto-price-proposal.
+    tools: []
+  - slug: nusa-auto-drift-sweep
+    title: "Nusa Auto price drift sweep"
+    summary: "Find any price or plan that differs from the price book and say who fixes it."
+    instructions: |-
+      KB 15 Part 2, job F. Run when asked and before any launch, deck or campaign.
+      1. Look in Linear, the KB documents, marketing drafts and the app catalogue for plan names and prices.
+      2. Compare with KB 15 Part 1; retired catalogues are in section 9.
+      3. Report each item: where → what it says → the fix → who fixes it (Ken for the app, 02-40 for marketing copy, Arthur for decks and the master book).
+    tools: []
+  - slug: nusa-auto-weekly-pack
+    title: "Nusa Auto weekly commercial pack"
+    summary: "After launch: the Monday commercial pack from POS and transaction data."
+    instructions: |-
+      KB 15 Part 2, job G. Before Monday planning:
+      1. Contribution per bay-minute by window.
+      2. Cars and average ticket by service and vehicle band.
+      3. Members, redemptions and net per member.
+      4. Walk-aways and queue at weekend peaks.
+      5. Top 3 actions with owner.
+      No POS data, no pack: say what is missing. Never invent actuals.
+    tools: []
+  - slug: meeting-notes
+    title: "Meeting notes and transcript"
+    summary: "Clean a transcript and write the synthesis with decisions, actions and open questions."
+    instructions: |-
+      Method KB 12.
+      1. Read everything first; load context (KB 01, KB 05, KB 06, the company's Linear project). Known names: Claire = Cilook, WD/Widi = Arthur, Fae = Fausto, Ken = Kenneth, Ito = Kristoforus Adhitya.
+      2. Clean: fix misheard words, names and terms; keep speakers, timestamps, doubt and disagreement; check numbers, currencies, dates, negations ("tidak", "belum", "bukan") twice. Unclear and consequential: quote it, give the readings, ask; else [UNCLEAR: ...].
+      3. Synthesis by topic: purpose and takeaway; points and reasoning; decisions made (mark "proposed" unless Arthur stated them); open ideas; implications labelled as interpretation; risks; next steps.
+      4. Two action lists: "Agreed in the meeting" and "Suggested follow-up (AW Memory)"; owner and date only if said.
+      5. File "YYYY-MM-DD <meeting> - synthesis" (and the transcript) in the company's Linear project; reply with the summary and link. Leave out pay, personal data and Arthur's positions toward others.
+    tools: []
+  - slug: decision-lookup
+    title: "What did we decide"
+    summary: "Answer what was decided, who owns what, or what is open, with the source."
+    instructions: |-
+      1. Look in KB 06 first, then the Linear Decision logs, project documents and issues.
+      2. Answer with the decision ID or source, the date and who decided. Proposed is not decided: say which it is.
+      3. Two records disagree: show both with dates and ask who should settle it; never pick one.
+      4. Not found: say so plainly and suggest who would know.
+    tools: []
+  - slug: cilook-status
+    title: "Cilook status and priorities"
+    summary: "Where Cilook stands: next date, done, late, blockers and owners."
+    instructions: |-
+      1. Read Linear "03 Cilook" (P-AP-10) and KB 16 section 6.
+      2. Answer: the next milestone and date (deposit page, Wave 1, Wave 2, Gate A 29 Jan 2027); what is done; what is late; open questions blocking it (KB 16 section 8); owner of each.
+      3. Top 3 priorities for this week with the coworker or person who does each.
+      4. Keep the Linear document "Cilook status" up to date when asked. Decisions are Arthur's: list proposals, never decide.
+    tools: []
+  - slug: cilook-feature-card
+    title: "Cilook feature card"
+    summary: "Turn a pain point or idea into a feature card with the boundary check."
+    instructions: |-
+      1. Problem: which pain point (1 coordination, 2 trust/knowledge/direction, 3 economics, or nanny), who has it, evidence (KB 16 section 5, small n stated).
+      2. The smallest version that solves it; what the parent, guardian and nanny or babysitter each do; input time (nanny under 2 minutes a day, no double entry).
+      3. What AI does and does not do; parents approve, change or veto.
+      4. Boundary check (KB 16 section 4): no diagnosis, scores, growth charts or monitoring; milestone layer = reminders, information, records; no processed food or brands; no audio, no AI on photos, no training on family data.
+      5. How we know it works (measure and decision rule); open questions; priority against D-012, D-023, D-025 and the pilot dates. Propose changes to Fausto's Feature Map; never overwrite it.
+    tools: []
+  - slug: cilook-experiment
+    title: "Cilook experiment design"
+    summary: "Design a pilot experiment with hypothesis, homes, measure and decision rule."
+    instructions: |-
+      1. Hypothesis in one sentence and the decision it informs.
+      2. Homes and days needed; walk the pilot calendar (Wave 1 16 Nov-18 Dec, Wave 2 4 Jan-5 Feb, Gate A 29 Jan) to check it fits; baseline days first.
+      3. Measure, how it is logged and by whom; minimum data before reading it (KB 17 section 6).
+      4. Decision rule (what result means build, change or drop).
+      5. Cost per home and who runs it. Only in consented homes; never a measure that makes the nanny report against herself.
+    tools: []
+  - slug: cilook-pilot-plan
+    title: "Cilook pilot plan and home tracker"
+    summary: "Keep the pilot calendar, the home tracker (codes only) and the consent checklist."
+    instructions: |-
+      1. Calendar: Wave 1 (8-10 homes, free, three baseline days first), Wave 2 (10-15 homes, baseline, 7-day trial, then monthly charge), Gate A on week-4 reads; Ramadan and Idul Fitri marked.
+      2. Home tracker (Linear document): home code H01..., segment fit, stage (invited, consented, baseline, active, paused, left), start date, owner, next step. No names, phones, addresses, photos or child details.
+      3. Before day one: written parental consent incl. any photo use; the nanny's agreement and fair treatment (UU 2/2026); safety-floor briefing; verified-consent rules from 16 Jan 2027 (PP 33/2026).
+      4. Messages to families or nannies: drafts for Destrin or Arthur to send.
+    tools: []
+  - slug: cilook-nanny-runsheet
+    title: "Nanny or babysitter run-sheet"
+    summary: "Write onboarding and daily run-sheets for the nanny or babysitter in simple Bahasa."
+    instructions: |-
+      1. Simple Bahasa Indonesia, one instruction per line, short words, no jargon.
+      2. Day one: what Cilook is (in her terms), what she gets, what she taps and when, how long (under 2 minutes a day), who to ask.
+      3. Daily: the plan arrives (time), what to do, how to log in at most 3 short batches.
+      4. Safety floor lines and "if the child is unwell or hurt: tell the parent at once"; never medical advice.
+      5. Run it through /cilook-brand-check; mark "Draft, Destrin approves".
+    tools: []
+  - slug: cilook-issue-log
+    title: "Cilook pilot issue log and weekly read"
+    summary: "Log pilot issues and write the weekly pilot read."
+    instructions: |-
+      1. Issue log entry: date, home code, what happened, severity (low / medium / high), owner, fix, status.
+      2. Health, safety or development worry: tell the parent to contact their doctor, midwife or posyandu, and tell Arthur the same day; never give advice.
+      3. Weekly pilot read: homes by stage; plans sent vs done; nanny minutes per day; parent recap opens; issues; what to change next week. Numbers only from logs; missing = "n/a".
+    tools: []
+  - slug: cilook-evidence-check
+    title: "Cilook evidence check"
+    summary: "Grade the evidence for a practice or claim and class it BC / EV / PS / EM."
+    instructions: |-
+      Method KB 17 sections 2-5.
+      1. Check KB 16 and the research log for existing sources first; reuse IDs.
+      2. Sources in order: WHO, IDAI, Kemenkes, Buku KIA → systematic reviews → RCTs → observational → practitioner. Open each one; mark anything not opened or secondary.
+      3. Per source: type, quality, applicability to Jakarta homes with a 1-3-year-old and a nanny, date, date opened, status.
+      4. Class the practice: BC consensus / EV evidence, context-dependent / PS paradigm-specific / EM emerging; keep class, evidence level and applicability separate. Paradigms are tags, never outcome claims.
+      5. Output: answer, sources table, limits. New sources to the Linear document "Cilook research log"; ask 03-60 or 00-41 to review before use.
+    tools: []
+  - slug: cilook-regulation-check
+    title: "Cilook regulation check"
+    summary: "Check a feature or claim against Indonesian rules on health software, child data and domestic work."
+    instructions: |-
+      1. Which rule could apply: Kepmenkes 951/2026 (diagnosis, screening or monitoring software = medical device), PP 33/2026 (verified parental consent from 16 Jan 2027), PP Tunas, UU 2/2026 (domestic workers), Permendikdasmen 3/2025 (no calistung tests for school entry), personal data law.
+      2. Read the official text; quote the article; date opened.
+      3. Say what the rule means for the feature, what is clear and what counsel must confirm. Never present your reading as legal advice.
+    tools: []
+  - slug: cilook-interview-synthesis
+    title: "Cilook interview synthesis"
+    summary: "Turn parent or nanny interview notes into evidence with small-n labelled."
+    instructions: |-
+      1. Who: segment fit (working parent with a nanny or babysitter, child 12-36 months, Jakarta), date, interviewer.
+      2. What they said: quotes in their words, by theme (feeding, school readiness, trust, coordination, price).
+      3. What it may suggest, labelled as interpretation; what it does not show.
+      4. Compare with earlier interviews (KB 16 section 5): agrees, contradicts, new.
+      5. Always "hypothesis, n = X", never "validated". Prices: quote the question asked and the answer.
+    tools: []
+  - slug: cilook-benchmark
+    title: "Cilook competitor benchmark"
+    summary: "Benchmark parenting, childcare and caregiver apps against Cilook."
+    instructions: |-
+      1. Each competitor: name, what it does, who it is for, price with date and link, platform, what users praise and complain about (real reviews, linked).
+      2. What it means for Cilook: what to copy, what to avoid, where we are different (built for the carer, WhatsApp in Bahasa, under 2 minutes a day).
+      3. Open every source; mark anything older than 6 months "to re-check".
+    tools: []
