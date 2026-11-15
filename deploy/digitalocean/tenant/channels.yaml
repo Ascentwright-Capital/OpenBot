@@ -46,18 +46,18 @@ channels:
     permitted_agents: [marketing-strategy]
     allowed_groups: [all]
   - id: marketing-content
-    name: 00-43-marketing-brand-content
-    description: "Brand voice, posts, copy, scripts and creative briefs, as drafts for approval."
+    name: 00-43-marketing-content-development
+    description: "Approved briefs in; copy, scripts, shot lists and production briefs out, as drafts for approval."
     permitted_agents: [marketing-content]
     allowed_groups: [all]
   - id: marketing-channels
-    name: 00-44-marketing-channels-growth
-    description: "Google Maps and search, social, ads, WhatsApp and partnerships: channel plans."
+    name: 00-44-marketing-distribution-execution
+    description: "Publishing packages, ad set-up sheets, creator and partner coordination, execution status."
     permitted_agents: [marketing-channels]
     allowed_groups: [all]
   - id: marketing-performance
-    name: 00-45-marketing-performance-reporting
-    description: "Marketing KPIs, measurement plans, reports and test readouts."
+    name: 00-45-marketing-performance-learning
+    description: "Results traced to campaigns and creatives, data gaps, recommendations and experiments."
     permitted_agents: [marketing-performance]
     allowed_groups: [all]
   - id: aw-memory
