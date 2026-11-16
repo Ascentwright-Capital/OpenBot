@@ -156,6 +156,9 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
   times per commit, so a broken build does not keep the droplet's CPU busy. The next merge tries
   again, or delete `~/.digital-factory-failed`. Read `/var/log/digital-factory-deploy.log`.
 - Only fast-forwards. Local commits on the droplet stop it, and the log says so.
+- After a deploy that worked, it removes images no container uses and build cache not used for a
+  day (AP-242), so the disk does not fill with old builds. The log line starts with `cleanup:`.
+  Volumes are never removed. A revert of a pull request older than a day rebuilds without cache.
 - `.env` is never touched. A change that needs a new setting still needs it added by hand first.
 - To pause it, comment out the `autodeploy.sh` line in `/etc/cron.d/digital-factory`.
 - **Watchdog:** each run first checks OpenBot's `/health` (through the Caddy container) and counts
