@@ -1,6 +1,7 @@
 #!/bin/sh
 # Deploys main when it moves. Host cron runs it every two minutes (see setup.sh):
-#   fetch origin/main; if it is not what was last deployed, fast-forward and rebuild.
+#   fetch origin/main; if it is not what was last deployed, fast-forward, build the images that are
+#   new, and start every service.
 # Pull, not push: nothing outside the droplet can reach it or holds a key to it, and a merge to main
 # is live within a few minutes. A build that fails leaves the running containers as they were, and
 # the same commit is tried again, up to three times, until it deploys or main moves on.
@@ -80,10 +81,30 @@ git -C "$repo" merge --ff-only -q origin/main
 # From here on OpenBot may be restarted, whether or not the deploy then succeeds. Whenever this run
 # ends, note the time and clear the watchdog's count, so those 502s are not read as a hang (AP-136).
 trap 'date +%s > "$restarted"; rm -f "$unhealthy"' EXIT
-# Every service, so a change to OPENBOT_REF, OPENTAG_REF or compose.yaml lands. Images whose source
-# did not change are reused from the build cache. `--wait` holds until every service is healthy, so a
-# deploy that starts but never comes up is not recorded and is tried again.
-docker compose --env-file .env --profile slack up -d --build --wait --wait-timeout 300
+# Build only the images that are not on the droplet yet (AP-135). Each built image is tagged with the
+# commit it is built from (OPENBOT_REF, OPENTAG_REF), so a tag that exists is that source, already
+# built. `up --build` built every image on every deploy, and the build cache does not cover the
+# OpenBot image: on 15 Nov that build took 86 minutes with the stack running and the droplet ran out
+# of memory. Without jq, build everything as before. A ref that is a branch name instead of a commit
+# is not rebuilt when the branch moves, so pin commits.
+if command -v jq >/dev/null 2>&1; then
+  missing=$(docker compose --env-file .env --profile slack config --format json |
+    jq -r '.services | to_entries[] | select(.value.build) | "\(.key) \(.value.image)"' |
+    while read -r service image; do
+      docker image inspect "$image" >/dev/null 2>&1 || printf '%s ' "$service"
+    done)
+  if [ -n "$missing" ]; then
+    echo "$(date -u +%FT%TZ) building: $missing"
+    # shellcheck disable=SC2086  # $missing is a list of service names
+    docker compose --env-file .env --profile slack build $missing
+  fi
+else
+  docker compose --env-file .env --profile slack build
+fi
+# Every service, so a change to OPENBOT_REF, OPENTAG_REF or compose.yaml lands. `--wait` holds until
+# every service is healthy, so a deploy that starts but never comes up is not recorded and is tried
+# again.
+docker compose --env-file .env --profile slack up -d --no-build --wait --wait-timeout 300
 # The coworkers and the Caddyfile are mounted, not built, so `up` does not see them change.
 changed=$(git -C "$repo" diff --name-only "${deployed:-$target}" "$target" -- . 2>/dev/null ||
   echo "tenant/ Caddyfile")
