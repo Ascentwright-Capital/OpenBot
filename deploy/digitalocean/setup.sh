@@ -11,7 +11,7 @@ DIR=/opt/digital-factory
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get -y upgrade
-apt-get -y install ca-certificates curl git ufw fail2ban unattended-upgrades
+apt-get -y install ca-certificates curl git jq ufw fail2ban unattended-upgrades
 
 # Security updates install themselves.
 dpkg-reconfigure -f noninteractive unattended-upgrades
