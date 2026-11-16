@@ -145,13 +145,17 @@ to the front desk rather than to one person's private conversation.
 
 A merge to `main` is live within a few minutes. Host cron runs [`autodeploy.sh`](autodeploy.sh)
 every two minutes: it fetches `origin/main`, and when that is not the commit it last deployed, it
-fast-forwards `/opt/digital-factory` and runs `docker compose --env-file .env --profile slack up -d
---build --wait`. So a pull request that moves `OPENBOT_REF` or `OPENTAG_REF` in `compose.yaml`, edits a
+fast-forwards `/opt/digital-factory`, builds the images that are not on the droplet yet, and runs
+`docker compose --env-file .env --profile slack up -d --no-build --wait`. So a pull request that moves `OPENBOT_REF` or `OPENTAG_REF` in `compose.yaml`, edits a
 coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
 
 - Pull, not push: GitHub holds no key to the droplet, and nothing new is opened to the internet.
 - The coworkers (`tenant/`) and the Caddyfile are mounted rather than built, so when a merge
   changes them it restarts `openbot` or reloads Caddy.
+- An image is built only when its tag is not on the droplet. The tag is the commit in `OPENBOT_REF`
+  or `OPENTAG_REF`, so a merge that changes neither builds nothing. A new `OPENBOT_REF` still builds
+  the OpenBot image with the stack running, which the 8 GB droplet cannot carry: build that image
+  ahead with the stack stopped, or with `autodeploy.sh` paused.
 - A failed build leaves the running containers as they were and is tried again, at most three
   times per commit, so a broken build does not keep the droplet's CPU busy. The next merge tries
   again, or delete `~/.digital-factory-failed`. Read `/var/log/digital-factory-deploy.log`.
