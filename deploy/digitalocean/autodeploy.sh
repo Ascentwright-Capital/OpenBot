@@ -118,3 +118,15 @@ fi
 echo "$target" > "$state"
 rm -f "$failed"
 echo "$(date -u +%FT%TZ) deployed $target"
+
+# Clean up after a deploy that worked (AP-242). Every new pin builds new images, and nothing removed
+# the old ones: on 14 Nov, 18 days in, about 90 GB of the 160 GB disk was images no container used
+# and build cache. So remove images no container uses that were built more than a week ago, and
+# build cache not used for a day. A week of old images stays on purpose: a revert to one of those
+# pins finds its image and starts without a build (AP-135), where a rebuild of OpenBot can take over
+# an hour. Never `--volumes`: the database is in one. A cleanup that fails does not fail the deploy.
+for step in "image prune -af --filter until=168h" "builder prune -af --filter until=24h"; do
+  # shellcheck disable=SC2086  # $step is a command and its flags
+  freed=$(docker $step 2>&1 | tail -n 1) || true
+  echo "$(date -u +%FT%TZ) cleanup: docker $step: ${freed:-no output}"
+done
