@@ -20,8 +20,8 @@ services:
   # this pin, because the Claude harness image has to match the server.
   openbot:
     build:
-      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-4af982637197bcdb0d219eb3e9b36f00c43745e9}
-    image: digital-factory/openbot:${OPENBOT_REF:-4af982637197bcdb0d219eb3e9b36f00c43745e9}
+      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-aad89b0256d6e31e2525666c9d4623ff82a76d5d}
+    image: digital-factory/openbot:${OPENBOT_REF:-aad89b0256d6e31e2525666c9d4623ff82a76d5d}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -70,9 +70,9 @@ services:
   opentag:
     profiles: ["slack"]
     build:
-      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-ad554ced09c0118e48750596018ec32aada625c0}
+      context: https://github.com/Ascentwright-Capital/OpenTag.git#${OPENTAG_REF:-478a50a63ee76b8b59f9100aa6b80fb903e526a3}
       dockerfile: deployment/docker/runtime.Dockerfile
-    image: digital-factory/opentag-runtime:${OPENTAG_REF:-ad554ced09c0118e48750596018ec32aada625c0}
+    image: digital-factory/opentag-runtime:${OPENTAG_REF:-478a50a63ee76b8b59f9100aa6b80fb903e526a3}
     restart: unless-stopped
     environment:
       AGENT_URL: http://openbot:3001/api/delivery/webhooks/opentag/agent
