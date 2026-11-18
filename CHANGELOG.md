@@ -13,6 +13,16 @@ endpoint (below), all empty. It creates only what is missing, so a database that
 is left as it is. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the
 secret, delete the rows in `jwks`, and connected Claude clients sign in again.
 
+### A Slack channel can belong to a Bot
+
+A thread started in a Slack channel named after one of the tenant package's channels is answered by
+that channel's Bot, whichever Bot the person linked: with a package channel `00-30-cto`, a mention in
+`#00-30-cto` reaches its Bot directly. A person still links Slack once, and the turn still runs as
+them, in a conversation of their own with that Bot. Direct messages and every other channel go to
+the linked Bot as before, and a thread already under way keeps its Bot. It needs an OpenTag that
+answers `POST /openbot/conversation`; with an older one nothing changes. See
+[Slack and Microsoft Teams](docs/configuration.md#slack-and-microsoft-teams-opentag-pairing).
+
 ### Manage OpenBot from Claude
 
 OpenBot is now an MCP server at `/api/mcp`. Add it to claude.ai, the Claude app or Claude Code and

@@ -580,3 +580,41 @@ test("a message in a shared chat thread runs in that thread's own conversation",
   await converse("t2");
   expect(turns[1]).toMatchObject(scope);
 });
+test("a thread in a Bot's own Slack channel runs with that Bot", async () => {
+  const f = fixture();
+  const turns: unknown[] = [];
+  const router = createDeliveryRouter({
+    store: f.store as never,
+    queue: f.queue,
+    owner: "w",
+    authoriseScope: async () => true,
+    scopeFor: async () => null,
+    threadBinding: async (person, thread) => ({
+      ...person,
+      identity: `${person.identity}#${thread.key}`,
+      agentId: thread.agentId ?? person.agentId,
+      channelId: "thread-channel",
+      threadId: "thread-conversation",
+    }),
+    runTurn: async (input) => {
+      turns.push(input);
+      return { replyText: "Reply" };
+    },
+    providers: {},
+  });
+  const result = await router.converse({
+    transport: "slack",
+    realm: "T",
+    identity: "U",
+    externalId: "c1",
+    text: "Hi",
+    signal: new AbortController().signal,
+    thread: { key: "slack-thread-2", title: "Hi", agentId: "cto" },
+  });
+  expect(result).toMatchObject({ binding: { agentId: "cto" } });
+  expect(turns[0]).toMatchObject({
+    agentId: "cto",
+    channelId: "thread-channel",
+    threadId: "thread-conversation",
+  });
+});

@@ -145,7 +145,8 @@ export function createDeliveryRouter(deps: {
    */
   threadBinding?(
     binding: DeliveryBinding,
-    thread: { key: string; title: string },
+    /** `agentId` names the Bot a new thread is for, when it is not the one the person linked. */
+    thread: { key: string; title: string; agentId?: string },
   ): Promise<DeliveryBinding>;
   runTurn(
     input: DeliveryScope & {
@@ -432,8 +433,11 @@ export function createDeliveryRouter(deps: {
     externalId: string;
     text: string;
     signal: AbortSignal;
-    /** The chat thread this message is in, when it should have a conversation of its own. */
-    thread?: { key: string; title: string };
+    /**
+     * The chat thread this message is in, when it should have a conversation of its own. `agentId`
+     * is the Bot the thread's Slack channel belongs to, used when the thread is new.
+     */
+    thread?: { key: string; title: string; agentId?: string };
   }): Promise<ConverseResult> {
     const person = await deps.store.findBinding(
       input.transport,

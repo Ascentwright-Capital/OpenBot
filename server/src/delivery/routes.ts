@@ -286,6 +286,8 @@ export function createDeliveryWebhookRoutes(deps: {
   ingestSlack?: OpenTagAgentDeps["ingestSlack"];
   /** Redeems OpenBot linked-account codes sent to the Slack app in a DM; cancels one posted in a channel. */
   identity?: OpenTagAgentDeps["identity"];
+  /** The Bot a Slack channel belongs to, so a thread started there reaches it. */
+  channelBot?: OpenTagAgentDeps["channelBot"];
 }) {
   const routes = new Hono<{ Variables: AppVariables }>();
   // A paired chat run carries its conversation's history, so it gets a larger envelope.
@@ -309,6 +311,7 @@ export function createDeliveryWebhookRoutes(deps: {
           ...(deps.approvals ? { approvals: deps.approvals } : {}),
           ...(deps.ingestSlack ? { ingestSlack: deps.ingestSlack } : {}),
           ...(deps.identity ? { identity: deps.identity } : {}),
+          ...(deps.channelBot ? { channelBot: deps.channelBot } : {}),
         },
         c.req.raw,
       ),

@@ -109,6 +109,44 @@ describe("real HTTP provider adapters", () => {
       }),
     ).rejects.toMatchObject({ code: "proactive_delivery_not_configured" });
   });
+  test("OpenTag names a Slack channel, or nothing", async () => {
+    const secret = "s".repeat(40);
+    const ask = { teamId: "T1", channelId: "C1" };
+    const named = http([{ name: "00-30-cto" }]);
+    const paired = (
+      wire: Parameters<typeof createOpenTagTransport>[0]["fetch"],
+    ) =>
+      createOpenTagTransport({
+        secret,
+        url: "http://127.0.0.1:3000",
+        fetch: wire,
+      });
+    expect(await paired(named.fetch).conversationName(ask)).toBe("00-30-cto");
+    expect(named.requests[0]?.url).toBe(
+      "http://127.0.0.1:3000/openbot/conversation",
+    );
+    expect(named.requests[0]?.init?.headers).toMatchObject({
+      authorization: `Bearer ${secret}`,
+    });
+    expect(JSON.parse(String(named.requests[0]?.init?.body))).toEqual(ask);
+    // A direct message, an OpenTag without the route, one that is away, and no OpenTag URL.
+    expect(
+      await paired(http([{ name: null }]).fetch).conversationName(ask),
+    ).toBeNull();
+    expect(
+      await paired(async () =>
+        Response.json({ error: "not_found" }, { status: 404 }),
+      ).conversationName(ask),
+    ).toBeNull();
+    expect(
+      await paired(async () => {
+        throw new Error("down");
+      }).conversationName(ask),
+    ).toBeNull();
+    expect(
+      await createOpenTagTransport({ secret }).conversationName(ask),
+    ).toBeNull();
+  });
   test("OpenTag membership fails closed", async () => {
     const secret = "s".repeat(40);
     const ask = { teamId: "T1", slackUserId: "U1", channelId: "C1" };

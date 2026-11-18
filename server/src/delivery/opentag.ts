@@ -107,6 +107,36 @@ export function createOpenTagTransport(config: OpenTagConfig) {
         return false;
       }
     },
+    /**
+     * A Slack channel's name, without the `#`, answered by OpenTag with the workspace's bot token
+     * (`POST /openbot/conversation`). Null for a direct message, on any error, and from an OpenTag
+     * that has no such route yet: the caller then treats the channel as nobody's.
+     */
+    async conversationName(input: {
+      teamId: string;
+      channelId: string;
+    }): Promise<string | null> {
+      if (!config.url) return null;
+      try {
+        const response = await wire(
+          new URL("/openbot/conversation", config.url),
+          {
+            method: "POST",
+            signal: AbortSignal.timeout(15_000),
+            headers: {
+              authorization: bearer,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(input),
+          },
+        );
+        if (!response.ok) return null;
+        const body = (await response.json()) as { name?: unknown };
+        return typeof body.name === "string" && body.name ? body.name : null;
+      } catch {
+        return null;
+      }
+    },
     async send(input: {
       id: string;
       address: string;
