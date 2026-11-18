@@ -47,6 +47,10 @@ function fixture(
     };
     answerInChannels?: boolean;
     cardReply?: string;
+    /** The Bot each Slack channel belongs to, by channel id. */
+    channelBots?: Record<string, string>;
+    /** Threads that already have a conversation of their own, by thread key. */
+    threads?: string[];
   } = {},
 ) {
   const calls: unknown[] = [];
@@ -122,7 +126,11 @@ function fixture(
         realm === "T1" &&
         identity === "U1"
           ? bound
-          : null,
+          : transport === "slack" &&
+              realm === "T1" &&
+              options.threads?.some((key) => identity === `U1#${key}`)
+            ? { ...bound, id: "b2", identity }
+            : null,
       botIdentity: async (agentId) => ({ agentId, name: "Research Bot" }),
     },
     scopeFor: async (ownerUserId, channelId, agentId) =>
@@ -139,6 +147,14 @@ function fixture(
     },
     twilio,
     ...(options.identity ? { identity: options.identity } : {}),
+    ...(options.channelBots
+      ? {
+          channelBot: async (input) => {
+            calls.push({ channelBot: input });
+            return options.channelBots?.[input.channelId] ?? null;
+          },
+        }
+      : {}),
     approvals: {
       store: {
         get: async (owner, id) => {
@@ -969,6 +985,56 @@ test("a shared thread asks for its own conversation; a direct message does not",
   });
   expect(conversed).toHaveLength(2);
   expect(Object.hasOwn(conversed[1] ?? {}, "thread")).toBe(false);
+});
+test("a new thread in a Bot's Slack channel is for that Bot; elsewhere it is for the linked Bot", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    channelBots: { C0CTO000001: "cto" },
+  });
+  const ask = (threadId: string, id: string, kind = "channel") =>
+    run(f, {
+      threadId,
+      context: [sender("slack:T1:U1", { id, kind })],
+      messages: [{ id: threadId, role: "user", content: "<@UBOT> fix it" }],
+    });
+  await ask("in-cto", "C0CTO000001");
+  await ask("in-general", "C0GENERAL01");
+  await ask("in-dm", "D0123456789", "im");
+  const conversed = f.calls
+    .map((c) => (c as { converse?: { thread?: unknown } }).converse)
+    .filter(Boolean);
+  expect(conversed.map((c) => c?.thread)).toEqual([
+    { key: "in-cto", title: "fix it", agentId: "cto" },
+    { key: "in-general", title: "fix it" },
+    undefined,
+  ]);
+  // A direct message is the person's own conversation: no channel is looked up for it.
+  expect(
+    f.calls
+      .map((c) => (c as { channelBot?: unknown }).channelBot)
+      .filter(Boolean),
+  ).toEqual([
+    { teamId: "T1", channelId: "C0CTO000001" },
+    { teamId: "T1", channelId: "C0GENERAL01" },
+  ]);
+});
+test("a thread already under way keeps the Bot it began with", async () => {
+  const f = fixture({
+    answerInChannels: true,
+    channelBots: { C0CTO000001: "cto" },
+    threads: ["older"],
+  });
+  await run(f, {
+    threadId: "older",
+    context: [sender("slack:T1:U1", { id: "C0CTO000001", kind: "channel" })],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> and then?" }],
+  });
+  expect(f.calls).toContainEqual({
+    converse: expect.objectContaining({
+      thread: { key: "older", title: "and then?" },
+    }),
+  });
+  expect(f.calls.some((c) => "channelBot" in (c as object))).toBe(false);
 });
 test("SMS STOP and START record opt-out without a turn or a second reply", async () => {
   const f = fixture();

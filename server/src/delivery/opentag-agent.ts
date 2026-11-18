@@ -20,6 +20,7 @@ import {
   ingestSlackEvent,
   type SlackTriggerEvent,
 } from "../responsibilities/slack";
+import type { ChannelBots } from "./channel-bots";
 import {
   agUiStream,
   approvalFields,
@@ -108,6 +109,12 @@ export type OpenTagAgentDeps = {
   approvals?: PairedApprovals;
   /** Slack trigger ingest; defaults to the responsibilities lane's `ingestSlackEvent`. */
   ingestSlack?: (event: SlackTriggerEvent) => Promise<unknown>;
+  /**
+   * The Bot a Slack channel belongs to, if any (see `channel-bots.ts`). A thread started in that
+   * channel is answered by that Bot instead of the one the person linked. Still as the person: the
+   * turn runs in a conversation of their own, and only if they may use that Bot.
+   */
+  channelBot?: ChannelBots;
   /**
    * OpenBot linked-account codes (Connections) from a Slack sender. Reachability
    * codes are checked first; this is used for any code that is not a live one (an expired or used
@@ -338,7 +345,7 @@ async function answer(
   const here = thread ? await threadBindingOf(deps, bound, thread.key) : bound;
   const answered = here && (await answerOpenQuestion(deps, here, message.text));
   if (answered) {
-    const bot = await deps.store.botIdentity(bound.agentId);
+    const bot = await deps.store.botIdentity(here.agentId);
     return {
       text: `Thanks. I passed your answer to ${bot?.name ?? "your Bot"}; it is continuing and will reply here.`,
     };
@@ -354,7 +361,12 @@ async function answer(
       : `${input.threadId}:${message.id ?? input.runId}`,
     text: message.text,
     signal,
-    ...(thread ? { thread } : {}),
+    ...(thread
+      ? {
+          // A thread already under way keeps the Bot it began with, whatever its channel is now.
+          thread: here ? thread : await inChannelBot(deps, sender, thread),
+        }
+      : {}),
   });
   if (result.kind === "unbound")
     return { text: linkInstructions(sender.transport) };
@@ -731,7 +743,26 @@ async function feedSlackTriggers(
   }
 }
 
-/** The sender's enabled binding, only while its owner still has that conversation and Bot. */
+/** A new thread, with the Bot its Slack channel belongs to when the channel has one. */
+async function inChannelBot(
+  deps: OpenTagAgentDeps,
+  sender: NonNullable<ReturnType<typeof senderFromContext>>,
+  thread: { key: string; title: string },
+) {
+  if (
+    !deps.channelBot ||
+    sender.transport !== "slack" ||
+    !sender.conversationId ||
+    !/^[A-Z0-9]{2,32}$/.test(sender.realm)
+  )
+    return thread;
+  const agentId = await deps.channelBot({
+    teamId: sender.realm,
+    channelId: sender.conversationId,
+  });
+  return agentId ? { ...thread, agentId } : thread;
+}
+
 /** The conversation one shared chat thread of this person's has had, if any. */
 async function threadBindingOf(
   deps: OpenTagAgentDeps,
@@ -752,6 +783,7 @@ async function threadBindingOf(
   return scope?.threadId === binding.threadId ? binding : null;
 }
 
+/** The sender's enabled binding, only while its owner still has that conversation and Bot. */
 async function ownedBinding(
   deps: OpenTagAgentDeps,
   person: { transport: ChatTransport; realm: string; identity: string },

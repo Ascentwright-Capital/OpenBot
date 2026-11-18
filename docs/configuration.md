@@ -695,6 +695,21 @@ audit on every turn. Anyone unlinked is told how to link and nothing runs. Appro
 as OpenTag approval cards (allow once, always allow, cancel) and are decided through the approvals
 service as the linked owner; a reply to a Bot's question answers that question.
 
+**A Slack channel can belong to a Bot.** Where the tenant package's `channels.yaml` names a channel
+with one Bot, and the Slack workspace has a channel of the same name, a thread started in that Slack
+channel is answered by that Bot instead of the one the person linked: with a package channel
+`00-30-cto` whose Bot is `cto`, a mention in `#00-30-cto` reaches `cto`. Nothing else is configured,
+and a person still links once. The turn runs as that person, in a conversation of their own with
+that Bot, and only when they may use it; otherwise their linked Bot answers. A thread keeps the Bot
+it began with, so one that was under way before a channel was renamed, or before this was turned
+on, carries on as it was. Direct messages, Slack channels named after no package channel, package
+channels with several Bots, and Teams are answered by the linked Bot as before.
+
+OpenBot asks OpenTag for the Slack channel's name (`POST /openbot/conversation`, so `OPENTAG_URL`
+must be set and the Slack app needs `channels:read`, and `groups:read` for private channels) and
+keeps it for five minutes. An OpenTag without that route, or one that cannot be reached, names no
+channel, and every thread goes to the linked Bot.
+
 The former direct Slack settings (`SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_BOT_TOKEN`,
 `SLACK_TEAM_ID`, `SLACK_SIGNING_SECRET`) are refused at start-up; unset them.
 

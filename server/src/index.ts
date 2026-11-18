@@ -171,6 +171,7 @@ import {
   recorderConnections,
   users,
 } from "./db/schema";
+import { createChannelBots } from "./delivery/channel-bots";
 import { createDeliveryRouter, DELIVERY_WORK_KINDS } from "./delivery/router";
 import { configuredDeliveryProviders } from "./delivery/routes";
 import { createDeliveryScopes } from "./delivery/scope";
@@ -2588,7 +2589,13 @@ const deliveryRouter = createDeliveryRouter({
     );
     if (found && (await authoriseDeliveryScope(found))) return found;
     const actor = await actorFor(person.ownerUserId);
-    const channel = await channelStore.create(actor, [person.agentId]);
+    // The Bot the thread's Slack channel belongs to, when the person may use it; otherwise the Bot
+    // they linked, as in a channel that belongs to nobody.
+    const agentId =
+      thread.agentId && (await agentProfileStore.get(actor, thread.agentId))
+        ? thread.agentId
+        : person.agentId;
+    const channel = await channelStore.create(actor, [agentId]);
     const title = thread.title.replace(/\s+/g, " ").trim();
     await database
       .update(channels)
@@ -2599,7 +2606,7 @@ const deliveryRouter = createDeliveryRouter({
     return deliveryStore.bind({
       ownerUserId: person.ownerUserId,
       channelId: channel.id,
-      agentId: person.agentId,
+      agentId,
       threadId: channel.threadId,
       transport: person.transport,
       realm: person.realm,
@@ -3350,6 +3357,15 @@ const app = createApp(
         slack: deliveryProviders.slack,
         twilio: deliveryProviders.sms,
         identity: slackCodeRedeemer(identityStore, bootAuditStore),
+        // A Slack channel named after a package channel belongs to that channel's Bot.
+        ...(deliveryProviders.slack
+          ? {
+              channelBot: createChannelBots({
+                channels: tenantPackage.channels,
+                nameOf: deliveryProviders.slack.conversationName,
+              }),
+            }
+          : {}),
       },
     },
     memory: { store: personalMemoryStore, ingestion: memoryIngestion },
