@@ -89,7 +89,8 @@ OpenTag reaches it over an outbound connection, so the droplet publishes nothing
 3. `docker compose --env-file .env --profile slack up -d --build`. The first build takes a few
    minutes: OpenTag is built from our copy of its `openbot-pairing` branch
    (Ascentwright-Capital/OpenTag), because no release has the pairing yet.
-4. In Slack, `/invite @Factory` to the channels it should work in.
+4. In Slack, `/invite @Factory` to the channels it should work in, including every coworker's
+   numbered channel.
 5. Each person opens the Orchestrator's page in OpenBot, **Reaching you**, **Connect**, and sends the
    `link <code>` it shows to @Factory in a direct message within ten minutes.
    If the dialog says "Failed to fetch", a browser ad or privacy blocker stopped the request
@@ -116,8 +117,17 @@ OpenBot's default, the channel gets a one-line notice and the answer goes to the
 after an approval, a Bot's questions and routine results arrive by DM through our OpenTag's
 `/openbot/deliver`, which needs `OPENTAG_SLACK_BOT_TOKEN`.
 
-Only people who linked their Slack (step 5) get answers; anyone else is told how to link. Each
-person's messages reach their own linked Bot.
+Only people who linked their Slack (step 5) get answers; anyone else is told how to link. One link
+is enough for every coworker.
+
+**Each numbered channel belongs to its coworker (D-75, AP-131).** A thread started in a Slack channel
+with the same name as a channel in [`tenant/channels.yaml`](tenant/channels.yaml) is answered by
+that channel's coworker: a mention in `#00-30-cto` reaches 00-30 CTO directly. The turn runs as the
+person who asked, in a conversation of their own with that coworker. Direct messages,
+`#00-00-factory-master` and every other channel reach the front desk the person linked. A thread
+keeps the coworker it began with. To add a coworker's channel: add it to `channels.yaml`, create the
+Slack channel with exactly that name, and invite @Factory. OpenBot asks OpenTag for the channel's
+name and keeps it for five minutes, so a new or renamed channel can take that long to be noticed.
 
 **Posts made through an app.** Slack marks a message an app posts for someone ("Sent using
 Claude") as an app's, and OpenTag ignores those so a bot can never answer itself. The accounts in
@@ -223,8 +233,9 @@ git checkout -b chore/sync-upstream-<date> && git merge upstream/main
   container. docs/deployment.md calls this fine for one team that trusts its own Bots. A computer per
   Bot needs the supervisor (or the Helm chart on a cluster), and is the next step once more than a
   few Bots or any untrusted Bot run here.
-- **Answers come from the asker's own Bot.** A channel thread is answered by whichever Bot the
-  asker linked, from that person's conversation with it. Coworkers shared by the whole team, each
-  with its own Slack app, are AP-92.
-- **One Slack identity.** Every coworker answers through @Factory, under its own name. A Slack
-  app and @handle per coworker is AP-92.
+- **Answers come from the asker's own conversation.** A channel thread runs as the person who
+  asked, with the coworker of that channel or, elsewhere, the Bot they linked. Coworkers do not
+  share one conversation across the team.
+- **One Slack identity.** Every coworker answers through @Factory (D-75). A thread starts with the
+  @Factory tag, in a coworker's channel too. `@Factory <Coworker>: …` from another channel still
+  goes through 00-00 Factory Master, which hands it over.
