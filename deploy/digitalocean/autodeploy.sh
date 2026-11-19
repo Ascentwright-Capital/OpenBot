@@ -10,6 +10,18 @@ cd "$(dirname "$0")"
 exec 9>/tmp/digital-factory-autodeploy.lock
 flock -n 9 || exit 0
 
+# Posts one line to Slack #00-digital-factory through the Factory app, so nobody has to log in to the
+# droplet to notice a restart or a failed deploy. Only that line is posted; the logs stay here. With
+# no token in .env, or when Slack does not answer, nothing is posted and the run carries on. The text
+# goes into JSON as it is, so it must not contain a double quote or a backslash.
+notify() {
+  token=$(sed -n 's/^OPENTAG_SLACK_BOT_TOKEN=//p' .env | head -n 1 | tr -d '"')
+  [ -n "$token" ] || return 0
+  curl -s -m 10 -X POST https://slack.com/api/chat.postMessage \
+    -H "Authorization: Bearer $token" -H "Content-type: application/json; charset=utf-8" \
+    -d "{\"channel\":\"C0CGRELFAMT\",\"text\":\"$1\"}" >/dev/null 2>&1 || true
+}
+
 # Watchdog (AP-124). OpenBot can stop answering without exiting, and `restart: unless-stopped`
 # only catches an exit: on 11 Nov the API answered 502 for 25 minutes until a deploy restarted
 # it. So every run first asks OpenBot's /health through Caddy's container (busybox wget). Two
@@ -50,15 +62,7 @@ else
     docker compose --env-file .env restart openbot || true
     rm -f "$unhealthy"
     date +%s > "$restarted"
-    # Say so in Slack #00-digital-factory through the Factory app, so nobody has to log in to notice.
-    # Only this notice is posted; the log lines stay on the droplet.
-    token=$(sed -n 's/^OPENTAG_SLACK_BOT_TOKEN=//p' .env | head -n 1 | tr -d '"')
-    if [ -n "$token" ]; then
-      curl -s -m 10 -X POST https://slack.com/api/chat.postMessage \
-        -H "Authorization: Bearer $token" -H "Content-type: application/json; charset=utf-8" \
-        -d "{\"channel\":\"C0CGRELFAMT\",\"text\":\"Watchdog: the factory stopped answering for about 4 minutes and was restarted at $(date -u +%H:%M) UTC. Logs are on the server in ~/openbot-hang-$stamp.log.\"}" \
-        >/dev/null 2>&1 || true
-    fi
+    notify "Watchdog: the factory stopped answering for about 4 minutes and was restarted at $(date -u +%H:%M) UTC. Logs are on the server in ~/openbot-hang-$stamp.log."
   fi
 fi
 
@@ -73,14 +77,35 @@ deployed=$(cat "$state" 2>/dev/null || true)
 # three tries. The next merge, or deleting the file, tries again.
 tries=$(sed -n "s/^$target //p" "$failed" 2>/dev/null || true)
 [ "${tries:-0}" -ge 3 ] && exit 0
-echo "$target $((${tries:-0} + 1))" > "$failed"
+try=$((${tries:-0} + 1))
+echo "$target $try" > "$failed"
+
+# Runs whenever this run ends: `set -e` ends it at the first step that fails, and the trap still runs.
+# Once the fast-forward is done, OpenBot may have been restarted, whether or not the deploy then
+# succeeded, so note the time and clear the watchdog's count: those 502s are not a hang (AP-136).
+# Then say how the deploy went (AP-270). A commit that keeps failing posts twice, on its first try
+# and on its third, and a deploy that works after a failed try says so.
+restarting=""
+deploy_ended() {
+  if [ -n "$restarting" ]; then
+    date +%s > "$restarted"
+    rm -f "$unhealthy"
+  fi
+  commit=$(echo "$target" | cut -c 1-7)
+  if [ "$1" -eq 0 ]; then
+    if [ "$try" -gt 1 ]; then notify "Deploy recovered: $commit is live, on try $try of 3."; fi
+  elif [ "$try" -eq 1 ]; then
+    notify "Deploy failed: $commit did not finish deploying. It is tried again in about 2 minutes, 3 tries in all. Log on the server: /var/log/digital-factory-deploy.log"
+  elif [ "$try" -ge 3 ]; then
+    notify "Deploy stopped: $commit failed 3 times and is not tried again. The next merge to main, or deleting ~/.digital-factory-failed on the server, starts over. Log: /var/log/digital-factory-deploy.log"
+  fi
+}
+trap 'deploy_ended $?' EXIT
 
 echo "$(date -u +%FT%TZ) deploying $target"
 # Only a fast-forward. A droplet with its own commits stops here and says so in the log.
 git -C "$repo" merge --ff-only -q origin/main
-# From here on OpenBot may be restarted, whether or not the deploy then succeeds. Whenever this run
-# ends, note the time and clear the watchdog's count, so those 502s are not read as a hang (AP-136).
-trap 'date +%s > "$restarted"; rm -f "$unhealthy"' EXIT
+restarting=1
 # Build only the images that are not on the droplet yet (AP-135). Each built image is tagged with the
 # commit it is built from (OPENBOT_REF, OPENTAG_REF), so a tag that exists is that source, already
 # built. `up --build` built every image on every deploy, and the build cache does not cover the

@@ -169,6 +169,10 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
 - A failed build leaves the running containers as they were and is tried again, at most three
   times per commit, so a broken build does not keep the droplet's CPU busy. The next merge tries
   again, or delete `~/.digital-factory-failed`. Read `/var/log/digital-factory-deploy.log`.
+- **A failed deploy is posted in Slack #00-digital-factory** (AP-270), through the Factory app with
+  `OPENTAG_SLACK_BOT_TOKEN`: on its first try, when it stops after the third, and when a later try
+  works. The second failed try posts nothing, so a broken commit gives at most two notices. A clean
+  deploy posts nothing. Without the token in `.env`, nothing is posted.
 - Only fast-forwards. Local commits on the droplet stop it, and the log says so.
 - After a deploy that worked, it removes unused images built more than a week ago and build cache
   not used for a day (AP-242), so the disk does not fill with old builds. The log line starts with
@@ -183,7 +187,7 @@ coworker under `tenant/`, or changes the Caddyfile deploys itself once merged.
   lines to `~/openbot-hang-<time>.log` and restart `openbot`, because a hung OpenBot does not exit and
   so `restart: unless-stopped` never fires. In `/var/log/digital-factory-deploy.log`, the line
   `watchdog: openbot ... (miss <n>)` marks each miss and `watchdog: openbot unhealthy` marks each restart.
-  A deploy or a watchdog restart clears the count, and 502s are not counted for three minutes after
+  Each restart is also posted in Slack #00-digital-factory. A deploy or a watchdog restart clears the count, and 502s are not counted for three minutes after
   either, because a restart itself makes Caddy answer 502 for a few seconds (AP-136).
 - **Idle transactions:** PostgreSQL ends any session that sits inside a transaction for a minute
   without running a statement (`idle_in_transaction_session_timeout`, AP-127). That is what hung the
