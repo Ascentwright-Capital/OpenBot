@@ -44,7 +44,7 @@ use crate::problem::Problem;
 pub const PODMAN: &str = "6.1.1";
 pub const COMPOSE: &str = "5.5.1";
 /// Keep aligned with the repository's packageManager and container runtime.
-pub const BUN: &str = "1.4.3";
+pub const BUN: &str = "1.4.4";
 
 /// A file to fetch and the digest it has to have.
 #[derive(Debug, PartialEq, Eq)]
@@ -221,31 +221,31 @@ fn ensure_bun_with(
 }
 
 fn bun_download(os: &str, arch: &str) -> Result<Download, Problem> {
-    // Official bun-v1.4.3/SHASUMS256.txt. The baseline x64 build also supports older CPUs.
+    // Official bun-v1.4.4/SHASUMS256.txt. The baseline x64 build also supports older CPUs.
     let (file, sha256) = match (os, arch) {
         ("windows", "x86_64") => (
             "bun-windows-x64-baseline.zip",
-            "d7a7d3eb216614544aab0cde2d8d9f2e4e87839bf5a30a1cd11d077f02d84e0c",
+            "0f20ce6674d4f2dbcc8c5d59fdf99f7ba45f8c3b367e0f5781cbfa30a1c78d99",
         ),
         ("windows", "aarch64") => (
             "bun-windows-aarch64.zip",
-            "5e8f142ef722cbc9f67dc068a166e46ee72be8307b38cac7186589d2face668f",
+            "2d57a0eec0cb44d95c918c3f9734f60455a1306ae5085d76fc68f44e3ee30d09",
         ),
         ("macos", "x86_64") => (
             "bun-darwin-x64-baseline.zip",
-            "0fde04e8b092156b97fe6432e899baf16d9ed6ce52cbb4218d2d9c07a2f827ef",
+            "d4a155adfbfd09155eb3ba05c9e3a544f39297d7a68616d3c7759f67ab5c47dc",
         ),
         ("macos", "aarch64") => (
             "bun-darwin-aarch64.zip",
-            "80afd4c069b46a6fa8f3ec520bebc750a7843e4a8d5b9583d29ad436c00a3403",
+            "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510",
         ),
         ("linux", "x86_64") => (
             "bun-linux-x64-baseline.zip",
-            "1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b",
+            "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76",
         ),
         ("linux", "aarch64") => (
             "bun-linux-aarch64.zip",
-            "efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21",
+            "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e",
         ),
         _ => {
             return Err(Problem::with(
@@ -824,17 +824,17 @@ mod tests {
     fn bun_zip_fixture(name: &str) -> (PathBuf, Download) {
         use base64::Engine as _;
 
-        // A deflated ZIP containing bun-fixture/bun, a /bin/sh script printing 1.4.3,
+        // A deflated ZIP containing bun-fixture/bun, a /bin/sh script printing 1.4.4,
         // and an unrelated traversal entry that must never be extracted. Fixed bytes keep
         // digest verification and real decompression in this offline regression.
         let bytes = base64::engine::general_purpose::STANDARD.decode(
-            "UEsDBBQAAAAIAAAAIVxUT2uCHQAAABsAAAAPAAAAYnVuLWZpeHR1cmUvYnVuU1bUT8rM0y/O4CooyswrSVNQN9Qz0TOOyVPnAgBQSwMEFAAAAAgAAAAhXDpV0AcXAAAAFQAAAA0AAAAuLi91bmV4cGVjdGVkyy0tLlHIyy9RSEpVSK0oKUpMLklNAQBQSwECFAMUAAAACAAAACFcVE9rgh0AAAAbAAAADwAAAAAAAAAAAAAAgAEAAAAAYnVuLWZpeHR1cmUvYnVuUEsBAhQDFAAAAAgAAAAhXDpV0AcXAAAAFQAAAA0AAAAAAAAAAAAAAIABSgAAAC4uL3VuZXhwZWN0ZWRQSwUGAAAAAAIAAgB4AAAAjAAAAAAA",
+            "UEsDBBQAAAAIAAAAIVxEk0swHQAAABsAAAAPAAAAYnVuLWZpeHR1cmUvYnVuU1bUT8rM0y/O4CooyswrSVNQN9Qz0TOJyVPnAgBQSwMEFAAAAAgAAAAhXDpV0AcXAAAAFQAAAA0AAAAuLi91bmV4cGVjdGVkyy0tLlHIyy9RSEpVSK0oKUpMLklNAQBQSwECFAMUAAAACAAAACFcRJNLMB0AAAAbAAAADwAAAAAAAAAAAAAAgAEAAAAAYnVuLWZpeHR1cmUvYnVuUEsBAhQDFAAAAAgAAAAhXDpV0AcXAAAAFQAAAA0AAAAAAAAAAAAAAIABSgAAAC4uL3VuZXhwZWN0ZWRQSwUGAAAAAAIAAgB4AAAAjAAAAAAA",
         ).unwrap();
         let root = temp_root(name);
         std::fs::create_dir_all(&root).unwrap();
         let download = Download {
             url: "http://127.0.0.1:1/never-reached".into(),
-            sha256: "2620378dbeb5b75aa500d3402928732c4e9f800a4546e609f2ff99be95470a29",
+            sha256: "2e484c390c67b5bd9eac67986f4c18ff1fd18274a7620b9c627cbab412826b60",
             file: "bun-fixture.zip",
         };
         std::fs::write(root.join(download.file), bytes).unwrap();
@@ -847,12 +847,12 @@ mod tests {
             (
                 "x86_64",
                 "bun-linux-x64-baseline.zip",
-                "1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b",
+                "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76",
             ),
             (
                 "aarch64",
                 "bun-linux-aarch64.zip",
-                "efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21",
+                "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e",
             ),
         ] {
             let download = bun_download("linux", arch).unwrap();
@@ -917,7 +917,7 @@ mod tests {
         extract_bun(&archive, &target, "bun-fixture/bun").unwrap();
         assert_eq!(
             std::fs::read(&target).unwrap(),
-            b"#!/bin/sh\nprintf '1.4.3\\n'\n"
+            b"#!/bin/sh\nprintf '1.4.4\\n'\n"
         );
         assert_eq!(std::fs::read_dir(&into).unwrap().count(), 1);
         assert!(!root.join("unexpected").exists());
