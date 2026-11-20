@@ -188,9 +188,11 @@ def test_an_anthropic_key_uses_the_official_endpoint_when_compose_sets_a_blank_u
     provider_app = _provider_app(provider_seen)
 
     async def respond(transport, request):
-        seen.append(
-            (request.url.scheme, request.url.host, request.url.path, request.headers.get("x-api-key"))
-        )
+        # The Anthropic SDK sends the key as `x-api-key` in older releases and as
+        # `Authorization: Bearer` in newer ones. Either is the key reaching the endpoint.
+        bearer = request.headers.get("authorization") or ""
+        key = request.headers.get("x-api-key") or bearer.removeprefix("Bearer ") or None
+        seen.append((request.url.scheme, request.url.host, request.url.path, key))
         async with httpx2.ASGITransport(app=provider_app) as local_provider:
             return await local_provider.handle_async_request(request)
 
