@@ -6,6 +6,8 @@ import { createRoleRepository } from "../auth/guards";
 import type { OpenBotRole } from "../auth/roles";
 import type { Database } from "../db/client";
 import {
+  accessRoleBots,
+  accessRolePeople,
   agentProfiles,
   agents,
   mcpServers,
@@ -517,6 +519,15 @@ export function createSharedUseStore(
     const sources = (
       await Promise.all(goals.map((goal) => sourcesOf(goal.id)))
     ).flat();
+    const inRoles = await database
+      .selectDistinct({ userId: accessRolePeople.userId })
+      .from(accessRoleBots)
+      .innerJoin(
+        accessRolePeople,
+        eq(accessRolePeople.roleId, accessRoleBots.roleId),
+      )
+      .where(eq(accessRoleBots.agentId, botId))
+      .orderBy(accessRolePeople.userId);
     return {
       /* A Bot with no profile is a package Bot: public and ownerless. */
       ownerUserId: profile?.ownerUserId ?? null,
@@ -526,6 +537,7 @@ export function createSharedUseStore(
         : null,
       assignments: assigned.map((row) => row.group),
       sources,
+      accessRolePeople: inRoles.map((row) => row.userId),
     };
   }
 

@@ -16,14 +16,21 @@ import type { AgentActor } from "./profile-types";
  * there for everyone who can sign in, so each of them may work its browser on their own seat.
  */
 export function canUseComputer(
-  profile: { visibility: string; ownerUserId: string | null } | null,
+  profile: {
+    visibility: string;
+    ownerUserId: string | null;
+    sharedByAccessRole?: boolean;
+  } | null,
   actor: Pick<AgentActor, "id" | "role">,
 ): boolean {
   if (!profile) return false;
   return (
     actor.role === "admin" ||
     profile.visibility === "public" ||
-    profile.ownerUserId === actor.id
+    profile.ownerUserId === actor.id ||
+    // An ownerless Bot from agents.yaml carries nobody's sign-ins, so the people in its access roles
+    // work it as everybody works a public one. A Bot somebody owns keeps its computer to them.
+    (profile.ownerUserId === null && profile.sharedByAccessRole === true)
   );
 }
 

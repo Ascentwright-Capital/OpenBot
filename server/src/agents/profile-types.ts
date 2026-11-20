@@ -18,6 +18,8 @@ export type AgentProfile = {
   pinned: boolean;
   /** An administrator assigned this Team Bot to this person; it stays in their sidebar. */
   assignedToMe?: boolean;
+  /** This person shares an access role with the Bot, so they may use it (AP-280). */
+  sharedByAccessRole?: boolean;
   deletedAt: Date | null;
   /** Where this coworker runs. Null for the Bot in the box. */
   endpoint: string | null;

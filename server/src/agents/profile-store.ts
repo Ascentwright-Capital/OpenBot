@@ -1,5 +1,6 @@
 import { declaredHarness } from "@openbot/shared/harnesses";
 import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { accessRoleAccess } from "../access-roles/access";
 import { capabilityRefusal } from "../admin/capabilities";
 import type { CredentialStore } from "../credentials";
 import type { Database } from "../db/client";
@@ -223,6 +224,7 @@ function joinedProfiles(executor: DatabaseExecutor, actor: AgentActor) {
       ...joinedProjection,
       // A Team Bot an administrator put in this person's sidebar.
       assignedToMe: sql<boolean>`${assignedToActor(actor.id, agents.id)}`,
+      sharedByAccessRole: sql<boolean>`${accessRoleAccess(actor.id, agents.id)}`,
     })
     .from(agents)
     .innerJoin(agentProfiles, eq(agentProfiles.agentId, agents.id))
@@ -244,6 +246,8 @@ function accessFilter(actor: AgentActor) {
     eq(agentProfiles.ownerUserId, actor.id),
     // A private Bot its owner published to the team, to this person, or to a group they are in.
     teamBotAccess(actor.id, agentProfiles.agentId),
+    // A Bot in an access role this person is in (AP-280).
+    accessRoleAccess(actor.id, agentProfiles.agentId),
   );
 }
 
@@ -269,6 +273,7 @@ function mapProfile(
     hidden: row.hiddenAt !== null,
     pinned: row.pinnedAt !== null,
     assignedToMe: Boolean(row.assignedToMe),
+    sharedByAccessRole: Boolean(row.sharedByAccessRole),
     deletedAt: row.deletedAt,
     isolated: row.isolated,
     endpoint: endpointOf(row.configuration),

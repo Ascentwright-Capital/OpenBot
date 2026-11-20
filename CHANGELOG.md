@@ -11,7 +11,18 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 **Before upgrading.** Migration `0089_oauth_provider` adds the OAuth tables behind the new MCP
 endpoint (below), all empty. It creates only what is missing, so a database that already has them
 is left as it is. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the
-secret, delete the rows in `jwks`, and connected Claude clients sign in again.
+secret, delete the rows in `jwks`, and connected Claude clients sign in again. Migration
+`0090_access_roles` adds three empty tables for access roles (below). Every Bot stays open to
+everyone until the package sets `open_to_everyone: false` on it.
+
+### Access roles decide who may use a Bot
+
+An admin can put people and Bots in access roles, such as "Nusa Auto" or "Finance". In `agents.yaml`,
+an agent lists `access_roles:` and sets `open_to_everyone: false`; then only the people in one of its
+access roles, and admins, may use it, on the web, in Slack, in routines and through a hand-off. Admins
+add people on the new Access roles page under Admin, and the People page shows each person's roles. A
+redeploy never changes who is in a role. Adding somebody re-approves the shared accounts the role's
+Bots use, the way publishing a Team Bot does.
 
 ### A Slack channel can belong to a Bot
 
