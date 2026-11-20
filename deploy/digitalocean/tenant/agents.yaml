@@ -84,6 +84,17 @@ agents:
       2. Answer with the decision ID or source, the date and who decided. Proposed is not decided: say which it is.
       3. Two records disagree: show both with dates and ask who should settle it; never pick one.
       4. Not found: say so plainly and suggest who would know.
+      /follow-up-and-status · Follow-up and status report
+      Use when someone asks where things stand, what is late or stuck, what a person owes, or to chase open items. Linear (team AP) is the only source; never fill a gap from memory.
+      1. Scope: confirm the project, person or label and the period. Defaults: the company's Linear project and the last 7 days. Say which scope you used.
+      2. Read the open issues in that scope with status, assignee, due date, last update and blockers, and the issues completed in the period.
+      3. Report, newest first, each line "AP-n Title · owner · due · last update" with a link:
+         Done in the period; Late (due date passed); Blocked (a blocking issue still open, or Blocked in the title or labels); Stale (open, no update for 7 days or more); No owner or no due date; Next 7 days (due soon).
+         Lead with one line: how many are late, blocked and stale. Leave out empty sections. Done means completed in Linear, not "nearly done" in a comment.
+      4. Follow-ups: draft one short comment per late, blocked or stale issue for its owner, with one concrete question ("Is the 21 Nov date still right, or what date should it be?"). Group by owner. At most 10 per report; say how many more there are.
+      5. Post a follow-up only after the person who asked has approved it. Never change an issue's status, owner, due date or priority yourself: propose the change in the report.
+      6. Want the report kept? Write it as a Linear document "Status <YYYY-MM-DD> <scope>" in that project, when asked.
+      Facts you cannot find (an owner, a date, why it is late): write "not in Linear", never a guess. Leave out pay, personal data and Arthur's positions toward others.
 
       Your knowledge base (Linear project "00 AscentWright" (P-AP-2)). Read KB 01 at the start of every new conversation, and the others when the request needs them:
       - KB 01 · AscentWright company facts: Linear document id 91e99d7a-47f3-4dc4-bd0d-79585ab02458
@@ -105,6 +116,7 @@ agents:
       - hand-over-a-request
       - request-a-coworker
       - decision-lookup
+      - follow-up-and-status
   - id: strategy-pitch
     name: 00-10 Strategy & Pitch
     title: Pitch, messages, fundraising and adviser scouting, AscentWright
@@ -1054,6 +1066,17 @@ agents:
       2. Answer with the decision ID or source, the date and who decided. Proposed is not decided: say which it is.
       3. Two records disagree: show both with dates and ask who should settle it; never pick one.
       4. Not found: say so plainly and suggest who would know.
+      /follow-up-and-status · Follow-up and status report
+      Use when someone asks where things stand, what is late or stuck, what a person owes, or to chase open items. Linear (team AP) is the only source; never fill a gap from memory.
+      1. Scope: confirm the project, person or label and the period. Defaults: the company's Linear project and the last 7 days. Say which scope you used.
+      2. Read the open issues in that scope with status, assignee, due date, last update and blockers, and the issues completed in the period.
+      3. Report, newest first, each line "AP-n Title · owner · due · last update" with a link:
+         Done in the period; Late (due date passed); Blocked (a blocking issue still open, or Blocked in the title or labels); Stale (open, no update for 7 days or more); No owner or no due date; Next 7 days (due soon).
+         Lead with one line: how many are late, blocked and stale. Leave out empty sections. Done means completed in Linear, not "nearly done" in a comment.
+      4. Follow-ups: draft one short comment per late, blocked or stale issue for its owner, with one concrete question ("Is the 21 Nov date still right, or what date should it be?"). Group by owner. At most 10 per report; say how many more there are.
+      5. Post a follow-up only after the person who asked has approved it. Never change an issue's status, owner, due date or priority yourself: propose the change in the report.
+      6. Want the report kept? Write it as a Linear document "Status <YYYY-MM-DD> <scope>" in that project, when asked.
+      Facts you cannot find (an owner, a date, why it is late): write "not in Linear", never a guess. Leave out pay, personal data and Arthur's positions toward others.
 
       Your knowledge base (Linear project "00 AscentWright" (P-AP-2)). Read KB 01 at the start of every new conversation, and the others when the request needs them:
       - KB 01 · AscentWright company facts: Linear document id 91e99d7a-47f3-4dc4-bd0d-79585ab02458
@@ -1076,6 +1099,7 @@ agents:
       - who-owns-this
       - meeting-notes
       - decision-lookup
+      - follow-up-and-status
   - id: adiruang-cto
     name: 01-30 Adiruang CTO
     title: Technology lead, Adiruang
