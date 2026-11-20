@@ -127,7 +127,7 @@ function fixture(
         transport === "slack" &&
         realm === (options.realm ?? "T1") &&
         identity === "U1"
-          ? { ...bound, realm }
+          ? bound
           : transport === "slack" &&
               realm === "T1" &&
               options.threads?.some((key) => identity === `U1#${key}`)
