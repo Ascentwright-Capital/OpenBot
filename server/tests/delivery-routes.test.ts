@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
-import { createOpenTagTransport } from "../src/delivery/opentag";
+import {
+  componentAsText,
+  createOpenTagTransport,
+} from "../src/delivery/opentag";
 import type { ConverseResult } from "../src/delivery/router";
 import { createDeliveryWebhookRoutes } from "../src/delivery/routes";
 import { createTwilioTransport } from "../src/delivery/twilio";
@@ -1341,4 +1344,144 @@ test("a channel message from a colleague who never linked still reaches the owne
       text: "deploy is broken",
     }),
   ]);
+});
+
+test("a Bot's table, checklist and record reach the thread as text, in order, beside its chart", async () => {
+  const f = fixture({
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "Here is the sprint.",
+      components: [
+        {
+          name: "showTable",
+          args: {
+            title: "Open issues",
+            caption: "Sorted by status",
+            columns: ["ID", "Title", "Status"],
+            rows: [
+              { cells: ["AP-1", "Fix the login\n page", "In progress"] },
+              { cells: ["AP-2", "Add search", 3] },
+            ],
+          },
+        },
+        {
+          name: "showBarChart",
+          args: { title: "Points", points: [{ label: "Done", value: 5 }] },
+        },
+        {
+          name: "showChecklist",
+          args: {
+            title: "Release",
+            items: [
+              { text: "Tag the build", done: true },
+              { text: "Tell support", done: false, note: "waiting on Ken" },
+            ],
+          },
+        },
+        {
+          name: "showRecord",
+          args: {
+            title: "AP-1",
+            subtitle: "Fix the login page",
+            status: "In progress",
+            fields: [{ label: "Owner", value: "Ken" }],
+          },
+        },
+        { name: "showRecord", args: { title: "Empty", fields: [] } },
+      ],
+      extras: { approvals: [], questions: [], handoffs: 0 },
+    },
+  });
+  const result = await run(f, {
+    tools: [{ name: "render_chart", description: "", parameters: {} }],
+    context: [sender()],
+    messages: [{ id: "m1", role: "user", content: "show the sprint" }],
+  });
+  const out = result.events
+    .filter(
+      (e) => e.type === "TOOL_CALL_START" || e.type === "TEXT_MESSAGE_CONTENT",
+    )
+    .map((e) =>
+      e.type === "TOOL_CALL_START" ? `[${e.toolCallName}]` : e.delta,
+    );
+  expect(out).toEqual([
+    "Here is the sprint.",
+    [
+      "**Open issues**",
+      "Sorted by status",
+      "_ID · Title · Status_",
+      "• AP-1 · Fix the login page · In progress",
+      "• AP-2 · Add search · 3",
+    ].join("\n"),
+    "[render_chart]",
+    ["**Release**", "☑ Tag the build", "☐ Tell support (waiting on Ken)"].join(
+      "\n",
+    ),
+    [
+      "**AP-1**",
+      "Fix the login page",
+      "Status: In progress",
+      "Owner: Ken",
+    ].join("\n"),
+  ]);
+  expect(result.events.at(-1)).toMatchObject({ type: "RUN_FINISHED" });
+});
+test("a Bot's table still reaches a Channel that offers no chart component", async () => {
+  const f = fixture({
+    converse: {
+      kind: "replied",
+      binding: bound,
+      inboxId: "in1",
+      replyText: "Here it is.",
+      components: [
+        {
+          name: "showTable",
+          args: {
+            title: "Plans",
+            columns: ["Plan"],
+            rows: [{ cells: ["Pro"] }],
+          },
+        },
+        {
+          name: "showBarChart",
+          args: { title: "Points", points: [{ label: "Done", value: 5 }] },
+        },
+      ],
+      extras: { approvals: [], questions: [], handoffs: 0 },
+    },
+  });
+  const result = await run(f, {
+    context: [sender()],
+    messages: [{ id: "m1", role: "user", content: "plans" }],
+  });
+  expect(result.events.some((e) => e.type === "TOOL_CALL_START")).toBe(false);
+  expect(
+    result.events
+      .filter((e) => e.type === "TEXT_MESSAGE_CONTENT")
+      .map((e) => e.delta),
+  ).toEqual(["Here it is.", "**Plans**\n_Plan_\n• Pro"]);
+});
+test("a long table shows its first 25 rows and says how many it left out", () => {
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    cells: [`AP-${i + 1}`],
+  }));
+  const text = componentAsText({
+    name: "showTable",
+    args: { title: "Issues", columns: ["ID"], rows },
+  });
+  const lines = text?.split("\n") ?? [];
+  expect(lines.filter((line) => line.startsWith("• "))).toHaveLength(25);
+  expect(lines.at(-2)).toBe("• AP-25");
+  expect(lines.at(-1)).toBe(
+    "5 more rows aren't shown here. Open the conversation in OpenBot to see them all.",
+  );
+  expect(componentAsText({ name: "showBarChart", args: { title: "x" } })).toBe(
+    undefined,
+  );
+  expect(componentAsText({ name: "showSomethingNew", args: {} })).toBe(
+    undefined,
+  );
+  expect(componentAsText({ name: "showChecklist", args: {} })).toBe(undefined);
 });

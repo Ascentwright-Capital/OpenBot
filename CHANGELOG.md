@@ -13,6 +13,14 @@ endpoint (below), all empty. It creates only what is missing, so a database that
 is left as it is. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the
 secret, delete the rows in `jwks`, and connected Claude clients sign in again.
 
+### A Bot's cards reach Slack and Teams threads as text
+
+When a Bot answers in a thread, its tables, checklists, records, headline figures, progress,
+notices and quotes are now posted as text after its reply, in the order the Bot drew them. Before,
+only its charts arrived, and only when the Channel offered its chart component. Charts are still
+drawn natively. A table shows its first 25 rows and says how many more are in OpenBot. The activity
+report says to open the conversation in OpenBot, since its figures are read there.
+
 ### A Slack channel can belong to a Bot
 
 A thread started in a Slack channel named after one of the tenant package's channels is answered by

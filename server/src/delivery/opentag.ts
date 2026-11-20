@@ -596,6 +596,164 @@ export function chartForOpenTag(component: {
   return null;
 }
 
+/** The most table rows posted as text. The rest are counted, and the conversation in OpenBot has them. */
+export const TABLE_ROWS_MAX = 25;
+/** The longest a component posted as text can be, comfortably inside one Slack message. */
+const TEXT_BLOCK_MAX = 3_500;
+const CELL_MAX = 200;
+
+/** A value as one line of text, or "" when there is none. */
+function line(value: unknown, max = TEXT_BLOCK_MAX): string {
+  const text =
+    typeof value === "string"
+      ? value
+      : typeof value === "number" && Number.isFinite(value)
+        ? String(value)
+        : "";
+  return clip(text.replace(/\s+/g, " ").trim(), max);
+}
+
+/** The entries of an array argument that are objects, whatever else the Bot put in it. */
+function entries(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (entry): entry is Record<string, unknown> =>
+          !!entry && typeof entry === "object",
+      )
+    : [];
+}
+
+/** A block's heading: its title in bold, then its caption, when it has them. */
+function heading(args: Record<string, unknown>): string[] {
+  const title = line(args.title, 200);
+  return [title ? `**${title}**` : "", line(args.caption)].filter(Boolean);
+}
+
+const ACTIVITY_REPORT_TEXT =
+  "The activity report is in OpenBot. Open the conversation there to see it.";
+
+function tableAsText(args: Record<string, unknown>): string | undefined {
+  const columns = (Array.isArray(args.columns) ? args.columns : [])
+    .map((column) => line(column, CELL_MAX))
+    .filter(Boolean);
+  const rows = entries(args.rows)
+    .map((row) =>
+      (Array.isArray(row.cells) ? row.cells : [])
+        .map((cell) => line(cell, CELL_MAX))
+        .join(" · "),
+    )
+    .filter((row) => row.replaceAll(" · ", "").trim());
+  if (!rows.length) return undefined;
+  const lines = [
+    ...heading(args),
+    ...(columns.length ? [`_${columns.join(" · ")}_`] : []),
+  ];
+  const more = (count: number) =>
+    `${count} more ${count === 1 ? "row isn't" : "rows aren't"} shown here. Open the conversation in OpenBot to see them all.`;
+  // Room is kept for the closing line, so a long table is cut at a row and still says so.
+  const room = TEXT_BLOCK_MAX - more(rows.length).length - 1;
+  let length = lines.join("\n").length;
+  let shown = 0;
+  for (const row of rows.slice(0, TABLE_ROWS_MAX)) {
+    const next = `• ${row}`;
+    if (length + 1 + next.length > room) break;
+    lines.push(next);
+    length += 1 + next.length;
+    shown++;
+  }
+  if (shown < rows.length) lines.push(more(rows.length - shown));
+  return lines.join("\n");
+}
+
+/** Each kind of component as its lines of text, after its heading. Charts are not here. */
+const BODY_AS_TEXT: ReadonlyMap<
+  string,
+  (args: Record<string, unknown>) => string[]
+> = new Map([
+  [
+    "showChecklist",
+    (args) =>
+      entries(args.items)
+        .filter((item) => line(item.text))
+        .map((item) => {
+          const note = line(item.note);
+          return `${item.done === true ? "☑" : "☐"} ${line(item.text)}${note ? ` (${note})` : ""}`;
+        }),
+  ],
+  [
+    "showRecord",
+    (args) => {
+      const status = line(args.status);
+      return [
+        line(args.subtitle),
+        status ? `Status: ${status}` : "",
+        ...entries(args.fields)
+          .filter((field) => line(field.label) || line(field.value))
+          .map((field) => `${line(field.label)}: ${line(field.value)}`),
+      ].filter(Boolean);
+    },
+  ],
+  [
+    "showMetrics",
+    (args) =>
+      entries(args.metrics)
+        .filter((metric) => line(metric.label) || line(metric.value))
+        .map((metric) => {
+          const change = line(metric.change);
+          return `${line(metric.label)}: ${line(metric.value)}${change ? ` (${change})` : ""}`;
+        }),
+  ],
+  [
+    "showProgress",
+    (args) =>
+      entries(args.points)
+        .filter((point) => line(point.label))
+        .map((point) => {
+          const target = line(point.target);
+          return `${line(point.label)}: ${line(point.value)}${target ? ` of ${target}` : ""}`;
+        }),
+  ],
+  [
+    "showNotice",
+    (args) => [
+      line(args.body),
+      ...(Array.isArray(args.points) ? args.points : [])
+        .map((point) => line(point))
+        .filter(Boolean)
+        .map((point) => `• ${point}`),
+    ],
+  ],
+]);
+
+/**
+ * One of the Bot's gallery cards as text for a chat thread, or undefined for a chart (drawn by the
+ * Channel, see {@link chartForOpenTag}), a component this build does not know, or one with nothing
+ * to show. Without it a Slack or Teams thread loses everything the Bot drew but its charts.
+ */
+export function componentAsText(component: {
+  name: string;
+  args: Record<string, unknown>;
+}): string | undefined {
+  const args = component.args ?? {};
+  if (component.name === "showTable") return tableAsText(args);
+  if (component.name === "showActivityReport")
+    return [...heading(args), ACTIVITY_REPORT_TEXT].join("\n");
+  if (component.name === "showQuote") {
+    const quote = line(args.quote);
+    if (!quote) return undefined;
+    const from = line(args.attribution);
+    return clip(
+      [`> ${quote}`, from ? `From ${from}` : "", line(args.context)]
+        .filter(Boolean)
+        .join("\n"),
+      TEXT_BLOCK_MAX,
+    );
+  }
+  const body = BODY_AS_TEXT.get(component.name)?.(args).filter(Boolean);
+  if (!body?.length) return undefined;
+  return clip([...heading(args), ...body].join("\n"), TEXT_BLOCK_MAX);
+}
+
 /**
  * The line said under a chart drawn natively, saying where its figures came from, or "" when the
  * Bot said nothing about that. OpenTag's chart has no caption, so without it a Slack or Teams chart
