@@ -795,7 +795,7 @@ const ALLOW: Allowed[] = [
   },
   {
     file: "server/tests/tenant-package.test.ts",
-    line: 358,
+    line: 360,
     shape: "b",
     finding: "NEW (round 2 did not find this)",
     why: "expect(tenantPackage.agents[1]?.avatarSeed).toBeUndefined();",

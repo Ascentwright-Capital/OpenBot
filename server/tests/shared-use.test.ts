@@ -207,6 +207,24 @@ describe("exposureOf", () => {
     });
   });
 
+  test("the people in a limited Bot's access roles are people it reaches", () => {
+    expect(
+      exposureOf(bot({ ownerUserId: null, accessRolePeople: ["u1", "u2"] })),
+    ).toEqual({
+      audience: "people",
+      outsideInput: false,
+      members: [
+        { kind: "user", value: "u1" },
+        { kind: "user", value: "u2" },
+      ],
+    });
+    // Open to everyone, its access roles add nobody: it already reaches the whole team.
+    expect(
+      exposureOf(bot({ visibility: "public", accessRolePeople: ["u1"] }))
+        .audience,
+    ).toBe("team");
+  });
+
   test("any outside source makes it outside input", () => {
     expect(
       exposureOf(bot({ sources: ["schedule", "slack"] })).outsideInput,

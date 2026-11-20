@@ -252,6 +252,7 @@ import { createModelCompleter } from "./routing/model";
 import { reportIntelligenceEntitlement } from "./intelligence-entitlement-check";
 import { createSelfHostBanner } from "./self-host-banner";
 import { createTeamBots } from "./team-bots/team-bots";
+import { createAccessRoleStore } from "./access-roles/store";
 import {
   createPackageStatusReader,
   loadTenantPackage,
@@ -2607,6 +2608,7 @@ const app = createApp(
     },
     groups: groupConversations,
     teamBots,
+    accessRoles: createAccessRoleStore(database),
     lifecycle: {
       lifecycle: createBotLifecycleStore(database),
       reset: createBotReset({

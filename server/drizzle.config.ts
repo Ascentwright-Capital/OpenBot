@@ -42,6 +42,7 @@ export default defineConfig({
     "./src/db/schema/shared-use.ts",
     "./src/db/schema/identity.ts",
     "./src/db/schema/oauth.ts",
+    "./src/db/schema/access-roles.ts",
   ],
   out: "./drizzle",
   dbCredentials: {

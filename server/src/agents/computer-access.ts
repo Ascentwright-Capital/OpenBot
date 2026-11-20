@@ -11,14 +11,21 @@ import type { AgentActor } from "./profile-types";
  * control. Public Bots are shared by everyone who can sign in, so their computer is too.
  */
 export function canUseComputer(
-  profile: { visibility: string; ownerUserId: string | null } | null,
+  profile: {
+    visibility: string;
+    ownerUserId: string | null;
+    sharedByAccessRole?: boolean;
+  } | null,
   actor: Pick<AgentActor, "id" | "role">,
 ): boolean {
   if (!profile) return false;
   return (
     actor.role === "admin" ||
     profile.visibility === "public" ||
-    profile.ownerUserId === actor.id
+    profile.ownerUserId === actor.id ||
+    // An ownerless Bot from agents.yaml carries nobody's browser, so its access roles share it the
+    // way everybody shares a public one. A Bot somebody owns keeps its computer to them.
+    (profile.ownerUserId === null && profile.sharedByAccessRole === true)
   );
 }
 

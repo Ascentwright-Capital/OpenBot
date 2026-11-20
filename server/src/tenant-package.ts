@@ -1,11 +1,14 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { parse } from "yaml";
+import { MAX_ACCESS_ROLE_NAME } from "./access-roles/access";
 import { DEPLOYMENT_ROUTES } from "./computer/deployment-routes";
 import type { Database } from "./db/client";
 import {
+  accessRoleBots,
+  accessRoles,
   agentProfiles,
   agents as agentTable,
   channelAgents,
@@ -170,7 +173,7 @@ export type TenantSkill = {
  * Every other value there is the id of the person who pressed the button, so this cannot collide
  * with one, and it is what lets a redeploy take back only what the package gave.
  */
-const PACKAGE_GRANT = "tenant-package";
+export const PACKAGE_GRANT = "tenant-package";
 
 type TenantAgent = {
   id: string;
@@ -193,6 +196,10 @@ type TenantAgent = {
    * pairs them by hand. The pairing is the package's to state: it wrote both files.
    */
   skills: string[];
+  /** The access roles this coworker is in, by name (AP-280). */
+  accessRoles: string[];
+  /** False limits it to the people in its access roles, and admins. */
+  openToEveryone: boolean;
 };
 
 type TenantChannel = {
@@ -299,6 +306,15 @@ function asList(value: unknown, name: string): unknown[] {
 function requiredString(value: unknown, name: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${name} must be a non-empty string`);
+  }
+  return value;
+}
+
+/** Left out means open to everyone, as every coworker was before access roles. */
+function openToEveryone(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "boolean") {
+    throw new Error("agent.open_to_everyone must be true or false");
   }
   return value;
 }
@@ -443,6 +459,13 @@ function parseAgents(
           agent.skills === undefined || agent.skills === null
             ? []
             : stringArray(agent.skills, "agent.skills"),
+        accessRoles:
+          agent.access_roles === undefined || agent.access_roles === null
+            ? []
+            : stringArray(agent.access_roles, "agent.access_roles").map(
+                (name) => requiredString(name, "agent.access_roles").trim(),
+              ),
+        openToEveryone: openToEveryone(agent.open_to_everyone),
       },
     ];
   });
@@ -555,6 +578,22 @@ export function validateTenantPackage(files: PackageFiles): TenantPackage {
           `agent "${agent.id}" names skill "${slug}", which this package does not ship`,
         );
       }
+    }
+    // Names are unique whatever their case, so two spellings would be one role written twice.
+    const roleNames = new Set<string>();
+    for (const name of agent.accessRoles) {
+      const key = name.toLowerCase();
+      if (roleNames.has(key)) {
+        throw new Error(
+          `agent "${agent.id}" names access role "${name}" twice`,
+        );
+      }
+      if (name.length > MAX_ACCESS_ROLE_NAME) {
+        throw new Error(
+          `agent "${agent.id}" names an access role longer than ${MAX_ACCESS_ROLE_NAME} characters`,
+        );
+      }
+      roleNames.add(key);
     }
   }
   const channelIds = new Set<string>();
@@ -792,6 +831,70 @@ export async function loadTenantPackage(
   };
 }
 
+type SyncTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * The access roles agents.yaml puts its coworkers in (AP-280).
+ *
+ * A role it names is created if no role answers to that name, whatever its case. The rows it wrote
+ * last time are replaced, like its skill grants, so a coworker taken out of a role leaves it. People
+ * are never touched: who is in a role is the admin's, on the Roles page.
+ */
+async function synchronizeAccessRoles(
+  transaction: SyncTransaction,
+  packageId: string,
+  packageAgents: readonly TenantAgent[],
+) {
+  await transaction
+    .delete(accessRoleBots)
+    .where(
+      and(
+        eq(accessRoleBots.grantedBy, PACKAGE_GRANT),
+        inArray(
+          accessRoleBots.agentId,
+          transaction
+            .select({ id: agentTable.id })
+            .from(agentTable)
+            .where(eq(agentTable.packageId, packageId)),
+        ),
+      ),
+    );
+  const names = [
+    ...new Map(
+      packageAgents
+        .flatMap((agent) => agent.accessRoles)
+        .map((name) => [name.toLowerCase(), name]),
+    ).values(),
+  ];
+  if (!names.length) return;
+  await transaction
+    .insert(accessRoles)
+    .values(names.map((name) => ({ id: randomUUID(), name })))
+    .onConflictDoNothing();
+  const idByName = new Map(
+    (
+      await transaction
+        .select({ id: accessRoles.id, name: accessRoles.name })
+        .from(accessRoles)
+        .where(
+          inArray(
+            sql`lower(${accessRoles.name})`,
+            names.map((name) => name.toLowerCase()),
+          ),
+        )
+    ).map((role) => [role.name.toLowerCase(), role.id]),
+  );
+  const rows = packageAgents.flatMap((agent) =>
+    agent.accessRoles.map((name) => ({
+      roleId: idByName.get(name.toLowerCase()) as string,
+      agentId: agent.id,
+      grantedBy: PACKAGE_GRANT,
+    })),
+  );
+  if (rows.length)
+    await transaction.insert(accessRoleBots).values(rows).onConflictDoNothing();
+}
+
 export async function synchronizeTenantPackage(
   database: Database,
   tenantPackage: LoadedTenantPackage,
@@ -903,7 +1006,7 @@ export async function synchronizeTenantPackage(
           title: agent.title,
           roleDescription: agent.roleDescription,
           avatarSeed: agent.avatarSeed ?? canonicalAgent.id,
-          visibility: "public",
+          visibility: agent.openToEveryone ? "public" : "private",
           deletedAt: null,
           updatedAt,
         })
@@ -915,7 +1018,7 @@ export async function synchronizeTenantPackage(
             title: agent.title,
             roleDescription: agent.roleDescription,
             avatarSeed: agent.avatarSeed ?? canonicalAgent.id,
-            visibility: "public",
+            visibility: agent.openToEveryone ? "public" : "private",
             deletedAt: null,
             updatedAt,
           },
@@ -928,6 +1031,12 @@ export async function synchronizeTenantPackage(
         );
       }
     }
+
+    await synchronizeAccessRoles(
+      transaction,
+      deploymentPackage.id,
+      tenantPackage.agents,
+    );
 
     for (const channel of tenantPackage.channels) {
       const [ownedChannel] = await transaction
