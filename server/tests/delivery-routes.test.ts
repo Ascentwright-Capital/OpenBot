@@ -51,6 +51,8 @@ function fixture(
     channelBots?: Record<string, string>;
     /** Threads that already have a conversation of their own, by thread key. */
     threads?: string[];
+    /** The workspace the person's link is stored under, in place of `T1`. */
+    realm?: string;
   } = {},
 ) {
   const calls: unknown[] = [];
@@ -123,7 +125,7 @@ function fixture(
       findBinding: async (transport, realm, identity) =>
         options.bound !== false &&
         transport === "slack" &&
-        realm === "T1" &&
+        realm === (options.realm ?? "T1") &&
         identity === "U1"
           ? bound
           : transport === "slack" &&
@@ -1017,6 +1019,29 @@ test("a new thread in a Bot's Slack channel is for that Bot; elsewhere it is for
     { teamId: "T1", channelId: "C0CTO000001" },
     { teamId: "T1", channelId: "C0GENERAL01" },
   ]);
+});
+test("a workspace the Channel does not name still gets its channel's Bot", async () => {
+  // The factory's managed Channel sends `slack:unknown:U…`, and links are stored under that realm.
+  const f = fixture({
+    answerInChannels: true,
+    channelBots: { C0CTO000001: "cto" },
+    realm: "unknown",
+  });
+  await run(f, {
+    threadId: "in-cto",
+    context: [
+      sender("slack:unknown:U1", { id: "C0CTO000001", kind: "channel" }),
+    ],
+    messages: [{ id: "m1", role: "user", content: "<@UBOT> fix it" }],
+  });
+  expect(f.calls).toContainEqual({
+    channelBot: { teamId: "unknown", channelId: "C0CTO000001" },
+  });
+  expect(f.calls).toContainEqual({
+    converse: expect.objectContaining({
+      thread: { key: "in-cto", title: "fix it", agentId: "cto" },
+    }),
+  });
 });
 test("a thread already under way keeps the Bot it began with", async () => {
   const f = fixture({
