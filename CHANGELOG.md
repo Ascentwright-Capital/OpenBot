@@ -61,6 +61,8 @@ token works nowhere but `/api/mcp`. Only on a deployment that signs people in it
 - The images are built with Bun 1.4.4 and Node.js 24.22.2, which fix a remote code execution flaw in
   the Brotli decoder (CVE-2026-111497). A deployment takes the fix by pulling or rebuilding its
   images; a clone needs Bun 1.4.4.
+- The desktop app installs Bun 1.4.4 as its app runtime, with the same fix. A computer that already
+  has the app downloads 1.4.4 on its next start and no longer accepts 1.4.3.
 - The MCP SDK is 1.32.2, which fixes two ways one HTTP request could exhaust an MCP server's memory
   (GHSA-f897-62hf-6gxq and CVE-2026-111768). OpenBot uses the SDK as a client, to call the MCP
   servers behind work apps, and to serve its own endpoint at `/api/mcp` (above).
