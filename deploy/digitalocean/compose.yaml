@@ -20,8 +20,8 @@ services:
   # this pin, because the Claude harness image has to match the server.
   openbot:
     build:
-      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-aad89b0256d6e31e2525666c9d4623ff82a76d5d}
-    image: digital-factory/openbot:${OPENBOT_REF:-aad89b0256d6e31e2525666c9d4623ff82a76d5d}
+      context: https://github.com/Ascentwright-Capital/OpenBot.git#${OPENBOT_REF:-2e208f6884d9429f7a0d24b5b21149ddeefbda0e}
+    image: digital-factory/openbot:${OPENBOT_REF:-2e208f6884d9429f7a0d24b5b21149ddeefbda0e}
     restart: unless-stopped
     env_file: .env
     environment:
