@@ -424,6 +424,15 @@ export const auditEventTypes = [
   "person.access_revoked",
   "person.access_restored",
   /*
+   * Who is in which access role (AP-280). An access role decides who may use a Bot, so who changed
+   * it and when belongs on the trail as much as a change of account type does.
+   */
+  "access_role.created",
+  "access_role.renamed",
+  "access_role.deleted",
+  "access_role.person_added",
+  "access_role.person_removed",
+  /*
    * An administrator took the trail out as a file. The trail is evidence, so who copied how much of
    * it, under which filter, belongs on it too.
    */

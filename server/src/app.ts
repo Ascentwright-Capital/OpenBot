@@ -6,6 +6,8 @@ import { serveStatic } from "hono/bun";
 import { MAX_IMAGE_BYTES } from "@openbot/shared/attachments";
 import { enterpriseControls } from "./admin/controls";
 import { createEnterpriseGate } from "./admin/gate";
+import { createAccessRoleRoutes } from "./access-roles/routes";
+import type { AccessRoleStore } from "./access-roles/store";
 import { createEnterpriseAdminRoutes } from "./admin/routes";
 import {
   authoriseAgentCall,
@@ -445,6 +447,8 @@ export function createApp(
     };
     groups?: GroupConversations;
     teamBots?: TeamBots;
+    /** Who shares which Bots, for admins on the Roles page (AP-280). */
+    accessRoles?: AccessRoleStore;
     /** Pause, reset, Activity and attention for a person's own Bots. See agents/lifecycle.ts. */
     lifecycle?: BotLifecycleServices;
   },
@@ -1715,6 +1719,16 @@ export function createApp(
     app.route(
       "/api/team-bots",
       createTeamBotRoutes(coworker.teamBots, requireUser, coworker.shared?.use),
+    );
+  if (coworker?.accessRoles)
+    app.route(
+      "/api/admin/access-roles",
+      createAccessRoleRoutes(
+        coworker.accessRoles,
+        requireUser,
+        auditStore,
+        coworker.shared?.use,
+      ),
     );
   /*
    * BEFORE `/api/approvals`, which would otherwise take every path under it and answer 404 for

@@ -8,7 +8,7 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 
 ## Unreleased
 
-**Before upgrading.** Ten things change for an existing deployment:
+**Before upgrading.** Eleven things change for an existing deployment:
 - A hosted computer's browser is now headed by default. It uses a little more memory than headless
   did; set `COMPUTER_BROWSER_MODE=headless` (Helm: `computers.browserMode: headless`) to keep the old
   behaviour.
@@ -45,6 +45,17 @@ Newest first. `Unreleased` is what is on `main` and not yet tagged.
 - Migration `0066_oauth_provider` adds the OAuth tables behind the new MCP endpoint (below), all
   empty. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the secret,
   delete the rows in `jwks`, and connected Claude clients sign in again.
+- Migration `0067_access_roles` adds three empty tables for access roles (below). Every Bot stays
+  open to everyone until the package sets `open_to_everyone: false` on it.
+
+### Access roles decide who may use a Bot
+
+An admin can put people and Bots in access roles, such as "Nusa Auto" or "Finance". In `agents.yaml`,
+an agent lists `access_roles:` and sets `open_to_everyone: false`; then only the people in one of its
+access roles, and admins, may use it, on the web, in Slack, in routines and through a hand-off. Who is
+in a role is managed under `/api/admin/access-roles` and is never changed by a redeploy. Adding
+somebody re-approves the shared accounts the role's Bots use, the way publishing a Team Bot does.
+There is no screen yet.
 
 ### Manage OpenBot from Claude
 

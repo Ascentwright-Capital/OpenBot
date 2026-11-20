@@ -23,6 +23,7 @@ import {
   teamBotAccess,
 } from "../team-bots/access";
 import { teamBotPublications } from "../db/schema/team-bots";
+import { accessRoleAccess } from "../access-roles/access";
 import { canManageAgent } from "./profile-policy";
 import type {
   AgentActor,
@@ -149,6 +150,7 @@ function joinedProfiles(executor: DatabaseExecutor, actor: AgentActor) {
       ...joinedProjection,
       // A Team Bot an administrator put in this person's sidebar.
       assignedToMe: sql<boolean>`${assignedToActor(actor.id, agents.id)}`,
+      sharedByAccessRole: sql<boolean>`${accessRoleAccess(actor.id, agents.id)}`,
     })
     .from(agents)
     .innerJoin(agentProfiles, eq(agentProfiles.agentId, agents.id))
@@ -170,6 +172,8 @@ function accessFilter(actor: AgentActor) {
     eq(agentProfiles.ownerUserId, actor.id),
     // A private Bot its owner published to the team, to this person, or to a group they are in.
     teamBotAccess(actor.id, agentProfiles.agentId),
+    // A Bot in an access role this person is in (AP-280).
+    accessRoleAccess(actor.id, agentProfiles.agentId),
   );
 }
 
@@ -191,6 +195,7 @@ function mapProfile(
     hidden: row.hiddenAt !== null,
     pinned: row.pinnedAt !== null,
     assignedToMe: Boolean(row.assignedToMe),
+    sharedByAccessRole: Boolean(row.sharedByAccessRole),
     deletedAt: row.deletedAt,
     endpoint: endpointOf(row.configuration),
     // Whether a key is set, never which. The form needs to show "a key is set" so a person does not

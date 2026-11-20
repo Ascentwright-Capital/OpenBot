@@ -72,6 +72,8 @@ function packageAgent(
     type: "built_in",
     configuration: { systemPrompt: "Be helpful." },
     skills: [],
+    accessRoles: [],
+    openToEveryone: true,
     ...overrides,
   };
 }
@@ -426,6 +428,8 @@ describe("tenant YAML validation", () => {
        * pairing is asserted here rather than left to whoever edits the YAML next.
        */
       skills: ["bot-creator", "skill-creator"],
+      accessRoles: [],
+      openToEveryone: true,
     });
     // The pairing the shipped package makes, which is the whole reason Knowledge narrows to document
     // tools rather than being offered everything its grants hold.

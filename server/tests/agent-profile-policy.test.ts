@@ -21,7 +21,11 @@ function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
     ownerUserId: creator.id,
     systemOwned: false,
     hidden: false,
+    pinned: false,
     deletedAt: null,
+    endpoint: null,
+    hasAuth: false,
+    hasCallbackToken: false,
     ...overrides,
   };
 }
@@ -45,6 +49,18 @@ describe("agent profile permissions", () => {
     expect(canRunAgent(creator, agent)).toBe(true);
     expect(canRunAgent(otherUser, agent)).toBe(false);
     expect(canRunAgent(admin, agent)).toBe(true);
+  });
+
+  test("lets somebody who shares an access role with a private profile access and run it", () => {
+    const agent = profile({
+      visibility: "private",
+      ownerUserId: null,
+      sharedByAccessRole: true,
+    });
+
+    expect(canAccessAgent(otherUser, agent)).toBe(true);
+    expect(canRunAgent(otherUser, agent)).toBe(true);
+    expect(canManageAgent(otherUser, agent)).toBe(false);
   });
 
   test("allows only the creator and admins to manage active user profiles", () => {
