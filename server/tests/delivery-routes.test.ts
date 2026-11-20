@@ -951,7 +951,7 @@ test("a chart drawn natively in Slack or Teams says where its figures came from"
         },
         { name: "showBarChart", args: { title: "Old", points } },
       ],
-      extras: { approvals: [], questions: [] },
+      extras: { approvals: [], questions: [], handoffs: 0 },
     },
   });
   const result = await run(f, {

@@ -334,6 +334,8 @@ test("a second paired message waits for the first turn instead of colliding with
   const gate = new Promise<void>((resolve) => (open = resolve));
   const started: string[] = [];
   const router = createDeliveryRouter({
+    // @ts-expect-error The fixture store returns null where the real store does not. Five older
+    // call sites carry the same error in typecheck-baseline.txt; fix the fixture, then drop this.
     store: f.store,
     queue: f.queue,
     owner: "w",
@@ -507,6 +509,8 @@ test("a message in a shared chat thread runs in that thread's own conversation",
   const turns: unknown[] = [];
   const asked: unknown[] = [];
   const router = createDeliveryRouter({
+    // @ts-expect-error The fixture store returns null where the real store does not. Five older
+    // call sites carry the same error in typecheck-baseline.txt; fix the fixture, then drop this.
     store: f.store,
     queue: f.queue,
     owner: "w",

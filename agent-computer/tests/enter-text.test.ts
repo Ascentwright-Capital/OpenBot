@@ -40,7 +40,9 @@ let browser: Browser;
 beforeAll(async () => {
   if (!asked) return;
   const { chromium } = await import("playwright");
-  browser = await chromium.launch();
+  // The full Chromium build, as sign-in.test.ts launches it: CI installs Chromium with --no-shell,
+  // so the headless shell that a bare launch() asks for is not there.
+  browser = await chromium.launch({ channel: "chromium" });
 });
 
 afterAll(async () => {
