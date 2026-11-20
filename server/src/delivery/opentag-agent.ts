@@ -27,6 +27,7 @@ import {
   COMPONENT_CALL_PREFIX,
   chartForOpenTag,
   chartSourcesLine,
+  componentAsText,
   componentCallEvents,
   confirmWriteInterrupt,
   isComponentFollowUp,
@@ -247,19 +248,26 @@ export async function handleOpenTagRun(
         const more = await outcome.followUp;
         say(more ?? HANDOFF_REPLY_LATE);
       }
-      // The Bot's charts, drawn natively by the Channel when it offers its chart component.
-      if (input.tools.some((tool) => tool.name === OPENTAG_CHART_TOOL))
-        for (const component of outcome.components ?? []) {
-          const args = chartForOpenTag(component);
-          if (!args) continue;
-          for (const event of componentCallEvents(
-            `${COMPONENT_CALL_PREFIX}${randomUUID()}`,
-            OPENTAG_CHART_TOOL,
-            args,
-          ))
-            emit(event);
-          say(chartSourcesLine(component.args));
+      // What the Bot drew, in its order: a chart drawn natively by the Channel when it offers its
+      // chart component, and every other card as text.
+      const charts = input.tools.some(
+        (tool) => tool.name === OPENTAG_CHART_TOOL,
+      );
+      for (const component of outcome.components ?? []) {
+        const args = charts ? chartForOpenTag(component) : null;
+        if (!args) {
+          const text = componentAsText(component);
+          if (text) say(text);
+          continue;
         }
+        for (const event of componentCallEvents(
+          `${COMPONENT_CALL_PREFIX}${randomUUID()}`,
+          OPENTAG_CHART_TOOL,
+          args,
+        ))
+          emit(event);
+        say(chartSourcesLine(component.args));
+      }
       if (outcome.interrupt)
         emit({
           type: "CUSTOM",
