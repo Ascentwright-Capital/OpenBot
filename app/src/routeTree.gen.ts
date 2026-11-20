@@ -29,6 +29,7 @@ import { Route as AuthedAppRoutinesRouteImport } from './routes/_authed/_app/rou
 import { Route as AuthedAppSkillsRouteImport } from './routes/_authed/_app/skills'
 import { Route as AuthedAppTeamBotsRouteImport } from './routes/_authed/_app/team-bots'
 import { Route as AuthedAdminIndexRouteImport } from './routes/_authed/admin/index'
+import { Route as AuthedAdminAccessRolesRouteImport } from './routes/_authed/admin/access-roles'
 import { Route as AuthedAdminApprovalsRouteImport } from './routes/_authed/admin/approvals'
 import { Route as AuthedAdminAuditRouteImport } from './routes/_authed/admin/audit'
 import { Route as AuthedAdminBoundariesRouteImport } from './routes/_authed/admin/boundaries'
@@ -69,6 +70,7 @@ import { Route as AuthedAppGroupNewRouteImport } from './routes/_authed/_app/gro
 import { Route as AuthedAppRoutinesNewRouteImport } from './routes/_authed/_app/routines_.new'
 import { Route as AuthedAppSScreenRouteImport } from './routes/_authed/_app/s/$screen'
 import { Route as AuthedAppStartStartIdRouteImport } from './routes/_authed/_app/start.$startId'
+import { Route as AuthedAdminAccessRolesRoleIdRouteImport } from './routes/_authed/admin/access-roles_.$roleId'
 import { Route as AuthedAdminApprovalsDescribeRouteImport } from './routes/_authed/admin/approvals_.describe'
 import { Route as AuthedAdminApprovalsGuidanceRouteImport } from './routes/_authed/admin/approvals_.guidance'
 import { Route as AuthedAdminBoundariesIndexRouteImport } from './routes/_authed/admin/boundaries_.$index'
@@ -209,6 +211,11 @@ const AuthedAppTeamBotsRoute = AuthedAppTeamBotsRouteImport.update({
 const AuthedAdminIndexRoute = AuthedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthedAdminRouteRoute,
+} as any)
+const AuthedAdminAccessRolesRoute = AuthedAdminAccessRolesRouteImport.update({
+  id: '/access-roles',
+  path: '/access-roles',
   getParentRoute: () => AuthedAdminRouteRoute,
 } as any)
 const AuthedAdminApprovalsRoute = AuthedAdminApprovalsRouteImport.update({
@@ -418,6 +425,12 @@ const AuthedAppStartStartIdRoute = AuthedAppStartStartIdRouteImport.update({
   path: '/start/$startId',
   getParentRoute: () => AuthedAppRoute,
 } as any)
+const AuthedAdminAccessRolesRoleIdRoute =
+  AuthedAdminAccessRolesRoleIdRouteImport.update({
+    id: '/access-roles_/$roleId',
+    path: '/access-roles/$roleId',
+    getParentRoute: () => AuthedAdminRouteRoute,
+  } as any)
 const AuthedAdminApprovalsDescribeRoute =
   AuthedAdminApprovalsDescribeRouteImport.update({
     id: '/approvals_/describe',
@@ -685,6 +698,7 @@ export interface FileRoutesByFullPath {
   '/routines': typeof AuthedAppRoutinesRoute
   '/skills': typeof AuthedAppSkillsRoute
   '/team-bots': typeof AuthedAppTeamBotsRoute
+  '/admin/access-roles': typeof AuthedAdminAccessRolesRoute
   '/admin/approvals': typeof AuthedAdminApprovalsRoute
   '/admin/audit': typeof AuthedAdminAuditRoute
   '/admin/boundaries': typeof AuthedAdminBoundariesRoute
@@ -721,6 +735,7 @@ export interface FileRoutesByFullPath {
   '/routines/new': typeof AuthedAppRoutinesNewRoute
   '/s/$screen': typeof AuthedAppSScreenRoute
   '/start/$startId': typeof AuthedAppStartStartIdRoute
+  '/admin/access-roles/$roleId': typeof AuthedAdminAccessRolesRoleIdRoute
   '/admin/approvals/describe': typeof AuthedAdminApprovalsDescribeRoute
   '/admin/approvals/guidance': typeof AuthedAdminApprovalsGuidanceRoute
   '/admin/boundaries/$index': typeof AuthedAdminBoundariesIndexRoute
@@ -783,6 +798,7 @@ export interface FileRoutesByTo {
   '/routines': typeof AuthedAppRoutinesRoute
   '/skills': typeof AuthedAppSkillsRoute
   '/team-bots': typeof AuthedAppTeamBotsRoute
+  '/admin/access-roles': typeof AuthedAdminAccessRolesRoute
   '/admin/approvals': typeof AuthedAdminApprovalsRoute
   '/admin/audit': typeof AuthedAdminAuditRoute
   '/admin/boundaries': typeof AuthedAdminBoundariesRoute
@@ -819,6 +835,7 @@ export interface FileRoutesByTo {
   '/routines/new': typeof AuthedAppRoutinesNewRoute
   '/s/$screen': typeof AuthedAppSScreenRoute
   '/start/$startId': typeof AuthedAppStartStartIdRoute
+  '/admin/access-roles/$roleId': typeof AuthedAdminAccessRolesRoleIdRoute
   '/admin/approvals/describe': typeof AuthedAdminApprovalsDescribeRoute
   '/admin/approvals/guidance': typeof AuthedAdminApprovalsGuidanceRoute
   '/admin/boundaries/$index': typeof AuthedAdminBoundariesIndexRoute
@@ -886,6 +903,7 @@ export interface FileRoutesById {
   '/_authed/_app/routines': typeof AuthedAppRoutinesRoute
   '/_authed/_app/skills': typeof AuthedAppSkillsRoute
   '/_authed/_app/team-bots': typeof AuthedAppTeamBotsRoute
+  '/_authed/admin/access-roles': typeof AuthedAdminAccessRolesRoute
   '/_authed/admin/approvals': typeof AuthedAdminApprovalsRoute
   '/_authed/admin/audit': typeof AuthedAdminAuditRoute
   '/_authed/admin/boundaries': typeof AuthedAdminBoundariesRoute
@@ -924,6 +942,7 @@ export interface FileRoutesById {
   '/_authed/_app/routines_/new': typeof AuthedAppRoutinesNewRoute
   '/_authed/_app/s/$screen': typeof AuthedAppSScreenRoute
   '/_authed/_app/start/$startId': typeof AuthedAppStartStartIdRoute
+  '/_authed/admin/access-roles_/$roleId': typeof AuthedAdminAccessRolesRoleIdRoute
   '/_authed/admin/approvals_/describe': typeof AuthedAdminApprovalsDescribeRoute
   '/_authed/admin/approvals_/guidance': typeof AuthedAdminApprovalsGuidanceRoute
   '/_authed/admin/boundaries_/$index': typeof AuthedAdminBoundariesIndexRoute
@@ -991,6 +1010,7 @@ export interface FileRouteTypes {
     | '/routines'
     | '/skills'
     | '/team-bots'
+    | '/admin/access-roles'
     | '/admin/approvals'
     | '/admin/audit'
     | '/admin/boundaries'
@@ -1027,6 +1047,7 @@ export interface FileRouteTypes {
     | '/routines/new'
     | '/s/$screen'
     | '/start/$startId'
+    | '/admin/access-roles/$roleId'
     | '/admin/approvals/describe'
     | '/admin/approvals/guidance'
     | '/admin/boundaries/$index'
@@ -1089,6 +1110,7 @@ export interface FileRouteTypes {
     | '/routines'
     | '/skills'
     | '/team-bots'
+    | '/admin/access-roles'
     | '/admin/approvals'
     | '/admin/audit'
     | '/admin/boundaries'
@@ -1125,6 +1147,7 @@ export interface FileRouteTypes {
     | '/routines/new'
     | '/s/$screen'
     | '/start/$startId'
+    | '/admin/access-roles/$roleId'
     | '/admin/approvals/describe'
     | '/admin/approvals/guidance'
     | '/admin/boundaries/$index'
@@ -1191,6 +1214,7 @@ export interface FileRouteTypes {
     | '/_authed/_app/routines'
     | '/_authed/_app/skills'
     | '/_authed/_app/team-bots'
+    | '/_authed/admin/access-roles'
     | '/_authed/admin/approvals'
     | '/_authed/admin/audit'
     | '/_authed/admin/boundaries'
@@ -1229,6 +1253,7 @@ export interface FileRouteTypes {
     | '/_authed/_app/routines_/new'
     | '/_authed/_app/s/$screen'
     | '/_authed/_app/start/$startId'
+    | '/_authed/admin/access-roles_/$roleId'
     | '/_authed/admin/approvals_/describe'
     | '/_authed/admin/approvals_/guidance'
     | '/_authed/admin/boundaries_/$index'
@@ -1423,6 +1448,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthedAdminIndexRouteImport
+      parentRoute: typeof AuthedAdminRouteRoute
+    }
+    '/_authed/admin/access-roles': {
+      id: '/_authed/admin/access-roles'
+      path: '/access-roles'
+      fullPath: '/admin/access-roles'
+      preLoaderRoute: typeof AuthedAdminAccessRolesRouteImport
       parentRoute: typeof AuthedAdminRouteRoute
     }
     '/_authed/admin/approvals': {
@@ -1704,6 +1736,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/start/$startId'
       preLoaderRoute: typeof AuthedAppStartStartIdRouteImport
       parentRoute: typeof AuthedAppRoute
+    }
+    '/_authed/admin/access-roles_/$roleId': {
+      id: '/_authed/admin/access-roles_/$roleId'
+      path: '/access-roles/$roleId'
+      fullPath: '/admin/access-roles/$roleId'
+      preLoaderRoute: typeof AuthedAdminAccessRolesRoleIdRouteImport
+      parentRoute: typeof AuthedAdminRouteRoute
     }
     '/_authed/admin/approvals_/describe': {
       id: '/_authed/admin/approvals_/describe'
@@ -2003,6 +2042,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedAdminRouteRouteChildren {
+  AuthedAdminAccessRolesRoute: typeof AuthedAdminAccessRolesRoute
   AuthedAdminApprovalsRoute: typeof AuthedAdminApprovalsRoute
   AuthedAdminAuditRoute: typeof AuthedAdminAuditRoute
   AuthedAdminBoundariesRoute: typeof AuthedAdminBoundariesRoute
@@ -2019,6 +2059,7 @@ interface AuthedAdminRouteRouteChildren {
   AuthedAdminSkillsRoute: typeof AuthedAdminSkillsRoute
   AuthedAdminWhatIfRoute: typeof AuthedAdminWhatIfRoute
   AuthedAdminIndexRoute: typeof AuthedAdminIndexRoute
+  AuthedAdminAccessRolesRoleIdRoute: typeof AuthedAdminAccessRolesRoleIdRoute
   AuthedAdminApprovalsDescribeRoute: typeof AuthedAdminApprovalsDescribeRoute
   AuthedAdminApprovalsGuidanceRoute: typeof AuthedAdminApprovalsGuidanceRoute
   AuthedAdminBoundariesIndexRoute: typeof AuthedAdminBoundariesIndexRoute
@@ -2038,6 +2079,7 @@ interface AuthedAdminRouteRouteChildren {
 }
 
 const AuthedAdminRouteRouteChildren: AuthedAdminRouteRouteChildren = {
+  AuthedAdminAccessRolesRoute: AuthedAdminAccessRolesRoute,
   AuthedAdminApprovalsRoute: AuthedAdminApprovalsRoute,
   AuthedAdminAuditRoute: AuthedAdminAuditRoute,
   AuthedAdminBoundariesRoute: AuthedAdminBoundariesRoute,
@@ -2054,6 +2096,7 @@ const AuthedAdminRouteRouteChildren: AuthedAdminRouteRouteChildren = {
   AuthedAdminSkillsRoute: AuthedAdminSkillsRoute,
   AuthedAdminWhatIfRoute: AuthedAdminWhatIfRoute,
   AuthedAdminIndexRoute: AuthedAdminIndexRoute,
+  AuthedAdminAccessRolesRoleIdRoute: AuthedAdminAccessRolesRoleIdRoute,
   AuthedAdminApprovalsDescribeRoute: AuthedAdminApprovalsDescribeRoute,
   AuthedAdminApprovalsGuidanceRoute: AuthedAdminApprovalsGuidanceRoute,
   AuthedAdminBoundariesIndexRoute: AuthedAdminBoundariesIndexRoute,

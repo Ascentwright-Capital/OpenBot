@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { accessRoleListQueryOptions } from "@/lib/access-roles/queries";
 import { currentUserQueryOptions } from "@/lib/auth/queries";
 import { terminateMemberComputersMutationOptions } from "@/lib/enterprise/mutations";
 import {
@@ -84,6 +85,15 @@ function PeoplePage() {
   const people = useInfiniteQuery(peopleListQueryOptions(query));
   const rows = people.data?.pages.flatMap((page) => page.people) ?? [];
   const currentUser = useQuery(currentUserQueryOptions());
+  /*
+   * Each person's access roles, read from the roles list. Left off the row while it loads or if it
+   * fails: this page is about who is here, and that must not wait on roles.
+   */
+  const accessRoles = useQuery(accessRoleListQueryOptions());
+  const rolesOf = new Map<string, string[]>();
+  for (const role of accessRoles.data ?? [])
+    for (const member of role.people)
+      rolesOf.set(member.id, [...(rolesOf.get(member.id) ?? []), role.name]);
   const setRole = useMutation(setPersonRoleMutationOptions(queryClient));
   const setAccess = useMutation(setPersonAccessMutationOptions(queryClient));
   // Offboarding: stops this person's Bots' computers, keeping their disks. Access is unchanged.
@@ -165,6 +175,9 @@ function PeoplePage() {
                       <ItemDescription>
                         {person.name ? `${person.email} · ` : ""}
                         {describe(person)}
+                        {rolesOf.has(person.id)
+                          ? ` · In ${rolesOf.get(person.id)?.join(", ")}`
+                          : ""}
                       </ItemDescription>
                     </ItemContent>
                     <ItemActions>
