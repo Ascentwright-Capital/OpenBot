@@ -749,11 +749,12 @@ async function inChannelBot(
   sender: NonNullable<ReturnType<typeof senderFromContext>>,
   thread: { key: string; title: string },
 ) {
+  // The realm is whatever the Channel names the workspace, not always a Slack team id (a managed
+  // Channel may send `unknown`), so it only keeps one workspace's channel names apart from another's.
   if (
     !deps.channelBot ||
     sender.transport !== "slack" ||
-    !sender.conversationId ||
-    !/^[A-Z0-9]{2,32}$/.test(sender.realm)
+    !sender.conversationId
   )
     return thread;
   const agentId = await deps.channelBot({
