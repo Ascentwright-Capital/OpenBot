@@ -22,6 +22,15 @@ const binding: DeliveryBinding = {
   address: "D",
   enabled: true,
 };
+/**
+ * The fixture store as the router's store type. The fixture answers `null` where the real store's
+ * types promise a row, so it does not satisfy that type as written. Five older call sites pass it
+ * directly and carry the resulting error in typecheck-baseline.txt; newer ones go through here so
+ * the debt does not grow. Fix the fixture's types, then drop this and those baseline entries.
+ */
+const asRouterStore = (store: unknown) =>
+  store as Parameters<typeof createDeliveryRouter>[0]["store"];
+
 function fixture(
   override: Partial<DeliveryBinding> = {},
   turnHook?: (router: ReturnType<typeof createDeliveryRouter>) => Promise<void>,
@@ -334,7 +343,7 @@ test("a second paired message waits for the first turn instead of colliding with
   const gate = new Promise<void>((resolve) => (open = resolve));
   const started: string[] = [];
   const router = createDeliveryRouter({
-    store: f.store,
+    store: asRouterStore(f.store),
     queue: f.queue,
     owner: "w",
     authoriseScope: async () => true,
@@ -507,7 +516,7 @@ test("a message in a shared chat thread runs in that thread's own conversation",
   const turns: unknown[] = [];
   const asked: unknown[] = [];
   const router = createDeliveryRouter({
-    store: f.store,
+    store: asRouterStore(f.store),
     queue: f.queue,
     owner: "w",
     authoriseScope: async () => true,

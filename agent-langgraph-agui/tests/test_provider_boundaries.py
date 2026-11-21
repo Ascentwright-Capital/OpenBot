@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -12,7 +13,6 @@ from threading import Thread
 
 import httpx2
 import pytest
-from anthropic import Anthropic
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -344,8 +344,9 @@ async def test_anthropic_selection_reaches_anthropic_boundary_without_openai_key
         headers.get("x-api-key") == "sk-ant-openbot-ci"
         or headers.get("authorization") == "Bearer sk-ant-openbot-ci"
     )
-    with Anthropic(api_key="sk-ant-openbot-ci") as sdk:
-        assert headers["anthropic-version"] == sdk.default_headers["anthropic-version"]
+    # The version is whichever one the installed langchain-anthropic or Anthropic SDK sends; the two
+    # have disagreed between releases. What matters here is that the Anthropic protocol was spoken.
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", headers["anthropic-version"])
     assert captured[0]["body"]["model"] == request_model
     assert captured[0]["body"]["messages"] == [
         {"role": "user", "content": "Say hello."}
