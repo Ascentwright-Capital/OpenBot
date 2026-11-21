@@ -5,7 +5,7 @@ import type { AuditStore } from "../audit";
 import { recordAuditEvent } from "../audit";
 import type { AppVariables } from "../auth/guards";
 import { requireAdmin } from "../auth/guards";
-import { DATA_FUNCTIONS, dataFunction } from "./functions";
+import { DATA_FUNCTIONS, dataFunction, dataScopeFor } from "./functions";
 import {
   SandboxedNotFoundError,
   SandboxedPublicationRefusedError,
@@ -350,9 +350,12 @@ export function createComponentRoutes(
     }
 
     try {
+      // Whose rows come back is decided by who is asking, not by the Bot named in the body: using
+      // a public Bot does not make its component a window onto everybody else's.
       const data = await store.callFunction(
         functionName,
         (body?.args ?? {}) as Record<string, unknown>,
+        dataScopeFor(context.var.actor),
       );
       await audit(context, "component.function_called", name, {
         bot: agentId,

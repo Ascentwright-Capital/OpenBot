@@ -27,14 +27,49 @@ import type { Database } from "../db/client";
  * nothing above it changes.
  */
 
+/**
+ * Whose Bots a call may read about, decided from the person calling and never from the body.
+ *
+ * A grant says a component may read the trail; it does not make the trail everybody's. An admin
+ * reads every Bot, as the audit screen does. Anyone else reads only the Bots they own, because the
+ * trail holds what other people's Bots were asked and refused.
+ */
+export type DataScope =
+  | { everyBot: true }
+  | { everyBot: false; ownerUserId: string };
+
+export function dataScopeFor(actor: {
+  id: string;
+  role: "admin" | "user";
+}): DataScope {
+  return actor.role === "admin"
+    ? { everyBot: true }
+    : { everyBot: false, ownerUserId: actor.id };
+}
+
 export type DataFunction = {
   name: string;
   /** What an administrator granting it needs to know. Never read by a model. */
   description: string;
   /** What it reads, in a few words, for the Admin page and for the audit row. */
   reads: string;
-  run: (database: Database, args: Record<string, unknown>) => Promise<unknown>;
+  run: (
+    database: Database,
+    args: Record<string, unknown>,
+    scope: DataScope,
+  ) => Promise<unknown>;
 };
+
+/**
+ * The audit rows this scope may see, as a condition to append. A row about no Bot is about the
+ * deployment, so only the every-Bot scope sees it.
+ */
+function auditRowsIn(scope: DataScope) {
+  if (scope.everyBot) return sql.empty();
+  return sql`and payload->>'bot' in (
+    select agent_id from agent_profiles where owner_user_id = ${scope.ownerUserId}
+  )`;
+}
 
 /** A whole number from an untrusted body, clamped into a range it is safe to run. */
 function bounded(
@@ -53,9 +88,9 @@ export const DATA_FUNCTIONS: DataFunction[] = [
   {
     name: "botActivity",
     description:
-      "How many actions each Bot has taken, counted from the audit trail.",
+      "How many actions each Bot has taken, counted from the audit trail. An admin sees every Bot. Anyone else sees only their own Bots.",
     reads: "the audit trail",
-    async run(database, args) {
+    async run(database, args, scope) {
       const days = bounded(args.days, { fallback: 7, min: 1, max: 90 });
       // Counted in the database rather than fetched and counted here: the trail is the one table that
       // grows without limit, and a component asking for a chart must not pull a year of it across the
@@ -65,6 +100,7 @@ export const DATA_FUNCTIONS: DataFunction[] = [
             from audit_events
             where payload->>'bot' is not null
               and created_at > now() - make_interval(days => ${days})
+              ${auditRowsIn(scope)}
             group by 1
             order by actions desc
             limit 12`,
@@ -75,9 +111,9 @@ export const DATA_FUNCTIONS: DataFunction[] = [
   {
     name: "recentRefusals",
     description:
-      "The most recent things this deployment refused, and the reason each was refused.",
+      "The most recent things this deployment refused, and the reason each was refused. An admin sees every Bot. Anyone else sees only their own Bots.",
     reads: "the audit trail",
-    async run(database, args) {
+    async run(database, args, scope) {
       const limit = bounded(args.limit, { fallback: 10, min: 1, max: 50 });
       const rows = await database.execute<{
         at: string;
@@ -96,6 +132,7 @@ export const DATA_FUNCTIONS: DataFunction[] = [
               'component.function_refused',
               'bot.declined'
             )
+            ${auditRowsIn(scope)}
             order by created_at desc
             limit ${limit}`,
       );

@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
-import { DATA_FUNCTIONS } from "../src/components/functions";
+import { createAuditStore, recordAuditEvent } from "../src/audit";
+import {
+  DATA_FUNCTIONS,
+  type DataScope,
+  dataScopeFor,
+} from "../src/components/functions";
 import {
   ComponentNotFoundError,
   type ComponentStore,
@@ -9,10 +14,12 @@ import {
 } from "../src/components/store";
 import { createDatabase } from "../src/db/client";
 import {
+  agentProfiles,
   agents,
   componentExclusions,
   componentFunctions,
   components,
+  users,
 } from "../src/db/schema";
 import { TEST_POOL, testDatabaseUrl } from "./support/database";
 
@@ -34,6 +41,7 @@ const botA = `agent_test_a_${suite}`;
 const botB = `agent_test_b_${suite}`;
 const fixtureComponentNames = new Set<string>();
 const fixtureAgentIds = new Set([botA, botB]);
+const fixtureUserIds = new Set<string>();
 
 async function makeComponent(name: string, published: boolean) {
   fixtureComponentNames.add(name);
@@ -70,6 +78,7 @@ afterAll(async () => {
     .where(inArray(componentExclusions.componentName, names));
   await database.delete(components).where(inArray(components.name, names));
   await database.delete(agents).where(inArray(agents.id, [...fixtureAgentIds]));
+  await database.delete(users).where(inArray(users.id, [...fixtureUserIds]));
 });
 
 describe("deciding whether a Bot may use a component", () => {
@@ -389,18 +398,136 @@ describe("what a component may read", () => {
   });
 
   test("every shipped function reads real rows and bounds its own arguments", async () => {
+    const scopes: DataScope[] = [
+      { everyBot: true },
+      { everyBot: false, ownerUserId: `nobody_${suite}` },
+    ];
     for (const entry of DATA_FUNCTIONS) {
-      // Run with nothing, which is what a component sends before the model has supplied anything, and
-      // with a hostile number: a value from the browser is a claim, and an unbounded one is a table
-      // scan somebody asked for over the wire.
-      expect(await entry.run(database, {})).toBeDefined();
-      expect(
-        await entry.run(database, { days: 100_000, limit: 100_000 }),
-      ).toBeDefined();
+      for (const scope of scopes) {
+        // Run with nothing, which is what a component sends before the model has supplied anything,
+        // and with a hostile number: a value from the browser is a claim, and an unbounded one is a
+        // table scan somebody asked for over the wire.
+        expect(await entry.run(database, {}, scope)).toBeDefined();
+        expect(
+          await entry.run(database, { days: 100_000, limit: 100_000 }, scope),
+        ).toBeDefined();
+      }
     }
   });
 
   test("a function this build does not ship cannot be run", async () => {
-    expect(store.callFunction(`nothing_${suite}`, {})).rejects.toThrow();
+    expect(
+      store.callFunction(`nothing_${suite}`, {}, { everyBot: true }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("whose audit rows a data function reads", () => {
+  // The trail holds other people's private Bots and the reasons their conversations were declined.
+  // A grant lets a component read it; who is asking decides how much of it comes back.
+  const memberA = { id: `user_member_a_${suite}`, role: "user" as const };
+  const memberB = { id: `user_member_b_${suite}`, role: "user" as const };
+  const admin = { id: `user_admin_${suite}`, role: "admin" as const };
+  const botOfA = `agent_owned_a_${suite}`;
+  const botOfB = `agent_owned_b_${suite}`;
+  const reasonOfA = `A-ONLY-${suite}`;
+  const reasonOfB = `B-ONLY-${suite}`;
+
+  type RefusalRow = { bot: string | null; what: string; reason: string };
+  type ActivityRow = { bot: string; actions: number };
+  const refusals = async (actor: typeof admin | typeof memberA) =>
+    (
+      (await store.callFunction(
+        "recentRefusals",
+        { limit: 50 },
+        dataScopeFor(actor),
+      )) as { rows: RefusalRow[] }
+    ).rows;
+  const activity = async (actor: typeof admin | typeof memberA) =>
+    (
+      (await store.callFunction("botActivity", {}, dataScopeFor(actor))) as {
+        rows: ActivityRow[];
+      }
+    ).rows;
+
+  beforeAll(async () => {
+    for (const person of [memberA, memberB, admin]) {
+      fixtureUserIds.add(person.id);
+      await database
+        .insert(users)
+        .values({ id: person.id, email: `${person.id}@example.test` });
+    }
+    for (const [bot, owner] of [
+      [botOfA, memberA],
+      [botOfB, memberB],
+    ] as const) {
+      fixtureAgentIds.add(bot);
+      await database.insert(agents).values({
+        id: bot,
+        name: bot,
+        type: "remote_ag_ui",
+        configuration: {},
+      });
+      await database.insert(agentProfiles).values({
+        agentId: bot,
+        ownerUserId: owner.id,
+        title: bot,
+        roleDescription: "A test Bot.",
+        avatarSeed: bot,
+        visibility: "private",
+      });
+    }
+    // Left in place: the trail is append-only, so a test cannot tidy up after itself.
+    const auditStore = createAuditStore(database);
+    for (const [bot, reason] of [
+      [botOfA, reasonOfA],
+      [botOfB, reasonOfB],
+    ]) {
+      await recordAuditEvent(auditStore, {
+        eventType: "bot.declined",
+        targetType: "agent",
+        targetId: bot,
+        payload: { bot, reason },
+      });
+    }
+  });
+
+  test("a member reads only the refusals of Bots they own", async () => {
+    const rows = await refusals(memberA);
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.bot === botOfA)).toBeTrue();
+    expect(rows).toContainEqual(
+      expect.objectContaining({ bot: botOfA, reason: reasonOfA }),
+    );
+    expect(rows.some((row) => row.reason === reasonOfB)).toBeFalse();
+  });
+
+  test("a member counts only the activity of Bots they own", async () => {
+    const rows = await activity(memberA);
+
+    expect(rows).toEqual([{ bot: botOfA, actions: 1 }]);
+  });
+
+  test("a member who owns no Bot reads nothing", async () => {
+    const nobody = { id: `user_nobody_${suite}`, role: "user" as const };
+
+    expect(await refusals(nobody)).toEqual([]);
+    expect(await activity(nobody)).toEqual([]);
+  });
+
+  test("an admin reads the refusals and activity of every Bot", async () => {
+    const rows = await refusals(admin);
+
+    expect(rows).toContainEqual(
+      expect.objectContaining({ bot: botOfA, reason: reasonOfA }),
+    );
+    expect(rows).toContainEqual(
+      expect.objectContaining({ bot: botOfB, reason: reasonOfB }),
+    );
+    // The admin owns neither Bot. At most one of the busiest twelve is A's, and B's rows exist, so a
+    // deployment-wide count always names a Bot that is not A's.
+    const counted = await activity(admin);
+    expect(counted.some((row) => row.bot !== botOfA)).toBeTrue();
   });
 });

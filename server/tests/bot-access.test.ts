@@ -426,8 +426,9 @@ describe("calling a tool as a Bot", () => {
 });
 
 describe("components, which a Bot answers with", () => {
-  function app(actorId: string) {
+  function app(actorId: string, role: "user" | "admin" = "user") {
     const touched: string[] = [];
+    const scopes: unknown[] = [];
     const store = {
       listForAgent: async (agentId: string) => {
         touched.push(`list:${agentId}`);
@@ -438,19 +439,21 @@ describe("components, which a Bot answers with", () => {
         return { allowed: true };
       },
       mayCall: async () => true,
-      callFunction: async () => {
+      callFunction: async (_name: string, _args: unknown, scope: unknown) => {
         touched.push("callFunction");
+        scopes.push(scope);
         return { rows: [] };
       },
     } as never;
 
     return {
       touched,
+      scopes,
       hono: new Hono().route(
         "/api/components",
         createComponentRoutes(
           store,
-          signedIn(actorId),
+          signedIn(actorId, role),
           undefined,
           ownedBy("owner"),
         ),
@@ -506,5 +509,27 @@ describe("components, which a Bot answers with", () => {
 
     expect(response.status).toBe(404);
     expect(touched).toEqual([]);
+  });
+
+  // Using a Bot lets you call its component. It does not make that component a window onto the
+  // trail of every other person's Bots: whose rows come back follows the caller, not the body.
+  test("reads a data function as the caller: their own Bots, or every Bot for an admin", async () => {
+    const call = (hono: Hono) =>
+      hono.request("http://t/api/components/chart/call", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          agentId: "sales",
+          function: "recentRefusals",
+          args: { everyBot: true, ownerUserId: "someone-else" },
+        }),
+      });
+    const member = app("owner");
+    expect((await call(member.hono)).status).toBe(200);
+    expect(member.scopes).toEqual([{ everyBot: false, ownerUserId: "owner" }]);
+
+    const admin = app("boss", "admin");
+    expect((await call(admin.hono)).status).toBe(200);
+    expect(admin.scopes).toEqual([{ everyBot: true }]);
   });
 });
