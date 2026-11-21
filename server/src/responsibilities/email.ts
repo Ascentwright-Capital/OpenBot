@@ -271,12 +271,44 @@ export function extractEmailText(raw: string, depth = 0): string {
     : decoded.trim();
 }
 
-function addressOf(value: string | undefined) {
-  const match = /<([^>]+)>/.exec(value ?? "");
-  return (match?.[1] ?? value ?? "").trim().toLowerCase();
+/**
+ * The one mailbox a From header names, lowercased, or "" when it does not name exactly one.
+ *
+ * SES authenticates the domain of the real mailbox, so the allow-list has to read that same
+ * mailbox. Quoted strings (with backslash escapes) and comments (which nest) are display text,
+ * so a `<...>` inside them is not the address. The address is the angle address that ends the
+ * mailbox, or the whole value when there is none. A list, a group, or anything that is not one
+ * plausible address gives "", which no allow-list entry matches.
+ */
+export function mailboxOf(value: string | undefined) {
+  let outside = "";
+  let quoted = false;
+  let depth = 0;
+  const text = value ?? "";
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (quoted || depth > 0) {
+      if (char === "\\") index++;
+      else if (quoted && char === '"') quoted = false;
+      else if (!quoted && char === "(") depth++;
+      else if (!quoted && char === ")") depth--;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === "(") depth = 1;
+    else if (char === ")") return "";
+    // Display text reads as a space, so it can never join two parts of an address.
+    outside += quoted || depth > 0 ? " " : char;
+  }
+  if (quoted || depth > 0 || /[,;:]/.test(outside)) return "";
+  const angle = /^[^<>]*<([^<>]*)>\s*$/.exec(outside);
+  if (!angle && /[<>]/.test(outside)) return "";
+  const address = (angle?.[1] ?? outside).trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+$/.test(address) ? address : "";
 }
 export function senderAllowed(sender: string, allowed: string[]) {
   if (allowed.length === 0) return true;
+  if (!sender) return false;
   const domain = sender.split("@")[1] ?? "";
   return allowed.some((entry) => {
     const wanted = entry.toLowerCase();
@@ -403,7 +435,10 @@ export function createEmailTriggerRoutes(
           .filter((id): id is string => !!id),
       ),
     ].slice(0, 10);
-    const from = addressOf(mail.commonHeaders?.from?.[0] ?? mail.source);
+    const fromHeader = mail.commonHeaders?.from ?? [];
+    // More than one From entry is more than one mailbox, and none of them is the sender.
+    const from =
+      fromHeader.length > 1 ? "" : mailboxOf(fromHeader[0] ?? mail.source);
     const authenticated =
       receipt?.dmarcVerdict?.status === "PASS" ||
       receipt?.dkimVerdict?.status === "PASS";

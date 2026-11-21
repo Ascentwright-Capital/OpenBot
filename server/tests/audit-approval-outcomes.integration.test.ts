@@ -253,9 +253,11 @@ test("a write the person denies is on the trail as refused, never as allowed or 
   });
 
   // A component listing recent refusals shows it in a person's words, not the Bot's instruction.
-  const refusals = await dataFunction("recentRefusals")?.run(database, {
-    limit: 50,
-  });
+  const refusals = await dataFunction("recentRefusals")?.run(
+    database,
+    { limit: 50 },
+    { everyBot: true },
+  );
   expect(
     (refusals as { rows: { bot: string; reason: string | null }[] }).rows.find(
       (entry) => entry.bot === bot,

@@ -6,7 +6,12 @@ import { DEPLOYMENT_INITIATOR, recordAuditEvent } from "../audit";
 import type { AppVariables } from "../auth/guards";
 import { requireAdmin } from "../auth/guards";
 import { currentEdition } from "../edition";
-import { DATA_FUNCTIONS, dataFunction, functionRefusal } from "./functions";
+import {
+  DATA_FUNCTIONS,
+  dataFunction,
+  dataScopeFor,
+  functionRefusal,
+} from "./functions";
 import { COMPONENT_DATA_FUNCTIONS, HEADLESS_COMPONENTS } from "./headless";
 import {
   SandboxedNotFoundError,
@@ -419,9 +424,12 @@ export function createComponentRoutes(
       return refuse(functionRefusal(name, functionName));
 
     try {
+      // Whose rows come back is decided by who is asking, not by the Bot named in the body: using
+      // a public Bot does not make its component a window onto everybody else's.
       const data = await store.callFunction(
         functionName,
         (body?.args ?? {}) as Record<string, unknown>,
+        dataScopeFor(context.var.actor),
       );
       await audit(context, "component.function_called", name, {
         bot: agentId,

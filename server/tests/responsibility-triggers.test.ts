@@ -9,7 +9,9 @@ import {
   createSnsVerifier,
   extractEmailText,
   isSnsUrl,
+  mailboxOf,
   type SnsMessage,
+  senderAllowed,
   snsStringToSign,
 } from "../src/responsibilities/email";
 import {
@@ -788,6 +790,77 @@ describe("inbound email via SES -> SNS", () => {
     const otherSender = harness({ allowedSenders: ["ops@other.test"] });
     await otherSender.post(signed({ ...base, Message: notification("PASS") }));
     expect(otherSender.events).toHaveLength(0);
+  });
+  test("an address in the display name does not pass allowedSenders", async () => {
+    // SES authenticates evil.test, the real mailbox. The quoted <...> is only display text.
+    const header = '"<ops@victim.test>" <attacker@evil.test>';
+    for (const allowedSenders of [["victim.test"], ["ops@victim.test"]]) {
+      const allowList = harness({ allowedSenders });
+      await allowList.post(
+        signed({ ...base, Message: notification("PASS", header) }),
+      );
+      expect(allowList.events).toHaveLength(0);
+    }
+    const open = harness();
+    await open.post(signed({ ...base, Message: notification("PASS", header) }));
+    expect(open.events[0]?.payload).toMatchObject({
+      from: "attacker@evil.test",
+    });
+  });
+  test("a From header with more than one mailbox passes no allowedSenders", async () => {
+    const twoEntries = JSON.parse(notification("PASS"));
+    twoEntries.mail.commonHeaders.from = [
+      "ops@example.com",
+      "attacker@evil.test",
+    ];
+    for (const message of [
+      notification("PASS", "ops@example.com, attacker@evil.test"),
+      JSON.stringify(twoEntries),
+    ]) {
+      const allowList = harness({ allowedSenders: ["example.com"] });
+      await allowList.post(signed({ ...base, Message: message }));
+      expect(allowList.events).toHaveLength(0);
+    }
+  });
+  test("mailboxOf reads the mailbox, not the display name or a comment", () => {
+    expect(mailboxOf('"<ops@victim.test>" <attacker@evil.test>')).toBe(
+      "attacker@evil.test",
+    );
+    expect(mailboxOf("attacker@evil.test (<ops@victim.test>)")).toBe(
+      "attacker@evil.test",
+    );
+    expect(
+      mailboxOf("(outer (<ops@victim.test>) still) <attacker@evil.test>"),
+    ).toBe("attacker@evil.test");
+    expect(
+      mailboxOf('"Ops \\"<ops@victim.test>\\" Team" <attacker@evil.test>'),
+    ).toBe("attacker@evil.test");
+    expect(mailboxOf("ops@example.com")).toBe("ops@example.com");
+    expect(mailboxOf("  Ops@Example.COM ")).toBe("ops@example.com");
+    expect(mailboxOf("Ops <Ops@Example.com>")).toBe("ops@example.com");
+    expect(mailboxOf('"Doe, Jane" <jane@example.com>')).toBe(
+      "jane@example.com",
+    );
+  });
+  test("mailboxOf gives nothing for more than one mailbox or an implausible address", () => {
+    for (const header of [
+      "ops@example.com, attacker@evil.test",
+      "Ops <ops@example.com>, Eve <attacker@evil.test>",
+      "Team: ops@example.com, attacker@evil.test;",
+      "<ops@example.com> <attacker@evil.test>",
+      "<ops@example.com> attacker@evil.test",
+      '"unterminated <ops@example.com>',
+      "(unclosed <ops@example.com>",
+      "ops@example.com)",
+      "Ops <ops at example.com>",
+      "Ops <ops@victim.test@evil.test>",
+      "Ops <>",
+      "Ops",
+      "",
+      undefined,
+    ])
+      expect(mailboxOf(header)).toBe("");
+    expect(senderAllowed("", ["example.com"])).toBe(false);
   });
   test("a signed SubscriptionConfirmation from the allowed topic is confirmed", async () => {
     const { confirmed, post } = harness();

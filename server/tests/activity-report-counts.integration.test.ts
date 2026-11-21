@@ -150,7 +150,11 @@ afterAll(async () => {
 async function reported() {
   const report = dataFunction("botActivity");
   if (!report) throw new Error("botActivity is not shipped");
-  const { rows } = (await report.run(database, { days: 7 })) as {
+  const { rows } = (await report.run(
+    database,
+    { days: 7 },
+    { everyBot: true },
+  )) as {
     rows: { bot: string; actions: number }[];
   };
   return rows.find((row) => row.bot === BOT)?.actions;
