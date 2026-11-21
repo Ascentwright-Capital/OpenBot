@@ -70,6 +70,15 @@ token works nowhere but `/api/mcp`. Only on a deployment that signs people in it
   November 1. Two of them let a request path slip past middleware attached with a wildcard or to a
   mounted route (GHSA-4m76-xfj5-7975, GHSA-h7mg-cq63-vhpq), which is how the server attaches its
   sign-in check.
+- An email trigger's `allowedSenders` now reads the real mailbox from the From header. A display
+  name such as `"<ops@example.com>" <someone@elsewhere.test>` no longer passes for ops@example.com.
+  A From header that names more than one mailbox, or none, matches no allow-list.
+- The activity and refusal data a component can read shows an admin every Bot and anyone else only
+  their own Bots. Before, any member who could use any Bot could read the whole deployment's.
+- In single-user mode, the server refuses API requests and Bot screen connections sent by another
+  site, so a page open in the same browser can no longer act as the admin. Requests from the
+  OpenBot app, the desktop app, the CLI and MCP clients are unaffected. A single-user server reached
+  at another address, such as an HTTPS proxy, needs that address in `TRUSTED_ORIGINS`.
 
 ### Each Bot on a shared computer has its own files
 
