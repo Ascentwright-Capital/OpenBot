@@ -1,4 +1,5 @@
 import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { accessRoleAccess } from "../access-roles/access";
 import type { ManagedAgentConfig } from "../config";
 import { type RegisteredAgent, registeredAgentFromRow } from "../copilot";
 import type { CredentialSecretReader } from "../credentials";
@@ -113,6 +114,8 @@ function selectActiveAgents(database: Database, actor: AgentActor) {
               eq(agentProfiles.ownerUserId, actor.id),
               // The same Team Bot rule as the roster: see team-bots/access.ts.
               teamBotAccess(actor.id, agentProfiles.agentId),
+              // And the same access role rule: see access-roles/access.ts.
+              accessRoleAccess(actor.id, agentProfiles.agentId),
             ),
       ),
     );

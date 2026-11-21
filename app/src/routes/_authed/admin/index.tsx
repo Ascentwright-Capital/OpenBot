@@ -14,6 +14,7 @@ import {
   IconRadar,
   IconShieldCheck,
   IconUsers,
+  IconUsersGroup,
   IconZoomQuestion,
 } from "@tabler/icons-react";
 import {
@@ -150,6 +151,13 @@ const SECTIONS: {
         description: "Review members, manage admin roles, and remove access.",
         icon: IconUsers,
         linkOptions: { to: "/admin/people" },
+      },
+      {
+        title: "Access roles",
+        description:
+          "Choose which people can use the Bots that aren't open to everyone.",
+        icon: IconUsersGroup,
+        linkOptions: { to: "/admin/access-roles" },
       },
       {
         title: "Permissions",

@@ -123,6 +123,8 @@ export type BotFacts = {
   } | null;
   assignments: readonly string[];
   sources: readonly string[];
+  /** Everybody in the Bot's access roles (AP-280). They reach a Bot that is not open to everyone. */
+  accessRolePeople?: readonly string[];
 };
 
 export function exposureOf(bot: BotFacts): SharedUseApproval {
@@ -141,6 +143,10 @@ export function exposureOf(bot: BotFacts): SharedUseApproval {
     ...bot.assignments.map((group) => ({
       kind: "group" as const,
       value: group,
+    })),
+    ...(bot.accessRolePeople ?? []).map((value) => ({
+      kind: "user" as const,
+      value,
     })),
   ];
   // A group can be both published to and assigned, and is still one member of the proposal. Matched

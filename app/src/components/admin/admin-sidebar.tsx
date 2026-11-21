@@ -15,6 +15,7 @@ import {
   IconShieldCheck,
   IconSlash,
   IconUsers,
+  IconUsersGroup,
   IconZoomQuestion,
 } from "@tabler/icons-react";
 import { Link, type LinkOptions } from "@tanstack/react-router";
@@ -122,6 +123,11 @@ const GROUPS: {
         title: "People",
         icon: IconUsers,
         linkOptions: { to: "/admin/people" },
+      },
+      {
+        title: "Access roles",
+        icon: IconUsersGroup,
+        linkOptions: { to: "/admin/access-roles" },
       },
       {
         title: "Permissions",

@@ -346,6 +346,7 @@ import {
   deliveryLineage,
   productHeadlessBoundary,
 } from "./telemetry/product-boundaries";
+import { createAccessRoleStore } from "./access-roles/store";
 import {
   createPackageStatusReader,
   deploymentNameOf,
@@ -3379,6 +3380,7 @@ const app = createApp(
     },
     groups: groupConversations,
     teamBots,
+    accessRoles: createAccessRoleStore(database),
     lifecycle: {
       lifecycle: createBotLifecycleStore(database),
       reset: createBotReset({

@@ -9,6 +9,7 @@ export function canAccessAgent(
   return (
     agent.visibility === "public" ||
     agent.ownerUserId === actor.id ||
+    agent.sharedByAccessRole === true ||
     actor.role === "admin"
   );
 }

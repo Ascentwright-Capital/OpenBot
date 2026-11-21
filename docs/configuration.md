@@ -1385,6 +1385,16 @@ An agent may list `skills:`, slugs of skills this package ships in `skills.yaml`
 does not ship, or the same slug twice, stops the server. Two agents with the same `id` in
 `agents.yaml` stop it as well.
 
+An agent may list `access_roles:`, the names of the access roles it is in, and set
+`open_to_everyone: false`. Then only the people in one of its access roles, and admins, may use it:
+on the web, in Slack, in routines and through a hand-off from another Bot. Left out,
+`open_to_everyone` is `true` and the agent is open to everyone who signs in, as before. A role the
+package names is created on start if none answers to that name, whatever its case. Admins put people
+in access roles on the Access roles page under Admin (the API is `/api/admin/access-roles`). A
+redeploy never changes who is in one, and a role the package names is renamed or removed only by
+editing the package. The same name twice on one
+agent, in any case, stops the server.
+
 The two types are told different amounts, which is easy to miss. A `built-in` agent gets its
 `system_prompt`; a `remote-ag-ui` agent has none, and its `role_description` is the only instruction
 it ever receives from the package. Write that sentence as the whole brief for the Bot, not as a

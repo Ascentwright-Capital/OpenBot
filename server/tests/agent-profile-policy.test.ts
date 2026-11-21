@@ -52,6 +52,18 @@ describe("agent profile permissions", () => {
     expect(canRunAgent(admin, agent)).toBe(true);
   });
 
+  test("lets somebody who shares an access role with a private profile access and run it", () => {
+    const agent = profile({
+      visibility: "private",
+      ownerUserId: null,
+      sharedByAccessRole: true,
+    });
+
+    expect(canAccessAgent(otherUser, agent)).toBe(true);
+    expect(canRunAgent(otherUser, agent)).toBe(true);
+    expect(canManageAgent(otherUser, agent)).toBe(false);
+  });
+
   test("allows only the creator and admins to manage active user profiles", () => {
     for (const visibility of ["public", "private"] as const) {
       const agent = profile({ visibility });
