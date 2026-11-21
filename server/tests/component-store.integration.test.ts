@@ -8,6 +8,7 @@ import {
 } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
+import { type DataScope, dataScopeFor } from "../src/components/functions";
 import {
   ComponentNotFoundError,
   type ComponentStore,
@@ -15,11 +16,13 @@ import {
 } from "../src/components/store";
 import { createDatabase } from "../src/db/client";
 import {
+  agentProfiles,
   agents,
   auditEvents,
   componentExclusions,
   componentFunctions,
   components,
+  users,
 } from "../src/db/schema";
 import { TEST_POOL, testDatabaseUrl } from "./support/database";
 
@@ -41,6 +44,9 @@ const botA = `agent_test_a_${suite}`;
 const botB = `agent_test_b_${suite}`;
 const fixtureComponentNames = new Set<string>();
 const fixtureAgentIds = new Set([botA, botB]);
+const fixtureUserIds = new Set<string>();
+/** What an admin's call reads: every Bot. The scoped reads have their own suite below. */
+const EVERY_BOT: DataScope = { everyBot: true };
 
 async function makeComponent(name: string, published: boolean) {
   fixtureComponentNames.add(name);
@@ -108,7 +114,7 @@ describe("component data functions against PostgreSQL", () => {
         event({ payload: {} }),
       ]);
 
-    expect(await reports.callFunction("botActivity", {})).toEqual({
+    expect(await reports.callFunction("botActivity", {}, EVERY_BOT)).toEqual({
       days: 7,
       rows: [
         { bot: "active-bot", actions: 2 },
@@ -139,7 +145,7 @@ describe("component data functions against PostgreSQL", () => {
     ]);
 
     expect(
-      await reports.callFunction("botActivity", { days: 100_000 }),
+      await reports.callFunction("botActivity", { days: 100_000 }, EVERY_BOT),
     ).toEqual({
       days: 90,
       rows: ranked.slice(0, 12),
@@ -179,30 +185,32 @@ describe("component data functions against PostgreSQL", () => {
         event({ eventType: "component.rendered", createdAt: new Date(now) }),
       ]);
 
-    expect(await reports.callFunction("recentRefusals", {})).toEqual({
-      rows: [
-        expect.objectContaining({
-          bot: "computer-bot",
-          what: "computer.action_refused",
-          reason: "Permission denied",
-        }),
-        expect.objectContaining({
-          bot: "component-bot",
-          what: "component.refused",
-          reason: "Component withheld",
-        }),
-        expect.objectContaining({
-          bot: "function-bot",
-          what: "component.function_refused",
-          reason: "Explicit reason",
-        }),
-        expect.objectContaining({
-          bot: null,
-          what: "bot.declined",
-          reason: null,
-        }),
-      ],
-    });
+    expect(await reports.callFunction("recentRefusals", {}, EVERY_BOT)).toEqual(
+      {
+        rows: [
+          expect.objectContaining({
+            bot: "computer-bot",
+            what: "computer.action_refused",
+            reason: "Permission denied",
+          }),
+          expect.objectContaining({
+            bot: "component-bot",
+            what: "component.refused",
+            reason: "Component withheld",
+          }),
+          expect.objectContaining({
+            bot: "function-bot",
+            what: "component.function_refused",
+            reason: "Explicit reason",
+          }),
+          expect.objectContaining({
+            bot: null,
+            what: "bot.declined",
+            reason: null,
+          }),
+        ],
+      },
+    );
   });
 
   test("recent refusals defaults to 10 and clamps the requested limit to 1 through 50", async () => {
@@ -220,7 +228,9 @@ describe("component data functions against PostgreSQL", () => {
       { args: { limit: 100_000 }, count: 50 },
       { args: { limit: 0 }, count: 1 },
     ]) {
-      expect(await reports.callFunction("recentRefusals", args)).toEqual({
+      expect(
+        await reports.callFunction("recentRefusals", args, EVERY_BOT),
+      ).toEqual({
         rows: fixtures.slice(0, count).map((_, index) =>
           expect.objectContaining({
             bot: `refusal-bot-${index}`,
@@ -244,6 +254,7 @@ afterAll(async () => {
     .where(inArray(componentExclusions.componentName, names));
   await database.delete(components).where(inArray(components.name, names));
   await database.delete(agents).where(inArray(agents.id, [...fixtureAgentIds]));
+  await database.delete(users).where(inArray(users.id, [...fixtureUserIds]));
 });
 
 describe("deciding whether a Bot may use a component", () => {
@@ -677,6 +688,120 @@ describe("what a component may read", () => {
   });
 
   test("a function this build does not ship cannot be run", async () => {
-    expect(store.callFunction(`nothing_${suite}`, {})).rejects.toThrow();
+    expect(
+      store.callFunction(`nothing_${suite}`, {}, EVERY_BOT),
+    ).rejects.toThrow();
+  });
+});
+
+describe("whose audit rows a data function reads", () => {
+  // The trail holds other people's private Bots and the reasons their conversations were declined.
+  // A grant lets a component read it; who is asking decides how much of it comes back.
+  const reportsDatabase = createDatabase(testDatabaseUrl(), { max: 1 });
+  const reports = createComponentStore(reportsDatabase);
+  const memberA = { id: `user_member_a_${suite}`, role: "user" as const };
+  const memberB = { id: `user_member_b_${suite}`, role: "user" as const };
+  const nobody = { id: `user_nobody_${suite}`, role: "user" as const };
+  const admin = { id: `user_admin_${suite}`, role: "admin" as const };
+  const botOfA = `agent_owned_a_${suite}`;
+  const botOfB = `agent_owned_b_${suite}`;
+  type Actor = typeof memberA | typeof admin;
+  type RefusalRow = { bot: string | null; what: string; reason: string };
+  type ActivityRow = { bot: string; actions: number };
+
+  const refusals = async (actor: Actor) =>
+    (
+      (await reports.callFunction(
+        "recentRefusals",
+        { limit: 50 },
+        dataScopeFor(actor),
+      )) as { rows: RefusalRow[] }
+    ).rows;
+  const activity = async (actor: Actor) =>
+    (
+      (await reports.callFunction("botActivity", {}, dataScopeFor(actor))) as {
+        rows: ActivityRow[];
+      }
+    ).rows;
+
+  beforeAll(async () => {
+    for (const person of [memberA, memberB, admin]) {
+      fixtureUserIds.add(person.id);
+      await database
+        .insert(users)
+        .values({ id: person.id, email: `${person.id}@example.test` });
+    }
+    for (const [bot, owner] of [
+      [botOfA, memberA],
+      [botOfB, memberB],
+    ] as const) {
+      fixtureAgentIds.add(bot);
+      await database.insert(agents).values({
+        id: bot,
+        name: bot,
+        type: "remote_ag_ui",
+        configuration: {},
+      });
+      await database.insert(agentProfiles).values({
+        agentId: bot,
+        ownerUserId: owner.id,
+        title: bot,
+        roleDescription: "A test Bot.",
+        avatarSeed: bot,
+        visibility: "private",
+      });
+    }
+    // The same temporary trail as the suite above, so other suites' rows never count here.
+    await reportsDatabase.execute(
+      sql`create temporary table audit_events (like public.audit_events including all)`,
+    );
+    await reportsDatabase.insert(auditEvents).values(
+      [
+        [botOfA, "A-ONLY"],
+        [botOfB, "B-ONLY"],
+      ].map(([bot, reason]) => ({
+        eventType: "bot.declined",
+        targetType: "agent",
+        targetId: bot,
+        payload: { bot, reason },
+      })),
+    );
+    // A row about no Bot is about the deployment.
+    await reportsDatabase.insert(auditEvents).values({
+      eventType: "component.refused",
+      targetType: "component",
+      payload: { reason: "DEPLOYMENT-WIDE" },
+    });
+  });
+
+  afterAll(async () => {
+    await reportsDatabase.$client.close();
+  });
+
+  test("a member reads only the refusals of Bots they own", async () => {
+    const rows = await refusals(memberA);
+
+    expect(rows.map((row) => row.bot)).toEqual([botOfA]);
+    expect(rows[0]?.reason).toBe("A-ONLY");
+  });
+
+  test("a member counts only the activity of Bots they own", async () => {
+    expect(await activity(memberA)).toEqual([{ bot: botOfA, actions: 1 }]);
+  });
+
+  test("a member who owns no Bot reads nothing", async () => {
+    expect(await refusals(nobody)).toEqual([]);
+    expect(await activity(nobody)).toEqual([]);
+  });
+
+  test("an admin reads every Bot, and the rows about no Bot", async () => {
+    const rows = await refusals(admin);
+
+    expect(rows.map((row) => row.bot).sort()).toEqual(
+      [botOfA, botOfB, null].sort(),
+    );
+    expect((await activity(admin)).map((row) => row.bot).sort()).toEqual(
+      [botOfA, botOfB].sort(),
+    );
   });
 });

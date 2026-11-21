@@ -612,7 +612,7 @@ const ALLOW: Allowed[] = [
     ],
     expression:
       // biome-ignore lint/suspicious/noTemplateCurlyInString: This is the literal source expression being identified.
-      "expect(store.callFunction(`nothing_${suite}`,{})).rejects.toThrow()",
+      "expect(store.callFunction(`nothing_${suite}`,{},EVERY_BOT),).rejects.toThrow()",
     finding: "NEW (round 2 did not find this)",
   },
   {

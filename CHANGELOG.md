@@ -13,6 +13,15 @@ endpoint (below), all empty. It creates only what is missing, so a database that
 is left as it is. Their signing keys are encrypted with `BETTER_AUTH_SECRET`: after changing the
 secret, delete the rows in `jwks`, and connected Claude clients sign in again.
 
+### Security fixes
+
+- An email trigger's `allowedSenders` now reads the real mailbox from the From header. A display
+  name such as `"<ops@example.com>" <someone@elsewhere.test>` no longer passes for ops@example.com.
+  A From header that names more than one mailbox, or none, matches no allow-list.
+- The activity and refusal data a component can read shows an admin every Bot and anyone else only
+  their own Bots. Before, any member who could use any Bot could read the whole deployment's. The
+  personal edition, where one person owns everything, is unchanged.
+
 ### A Slack channel can belong to a Bot
 
 A thread started in a Slack channel named after one of the tenant package's channels is answered by
