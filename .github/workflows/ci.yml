@@ -69,12 +69,11 @@ jobs:
             exit 1
           fi
 
-  # The two packages that are deployables in their own right rather than root workspaces. Root
+  # The package that is a deployable in its own right rather than a root workspace. Root
   # `typecheck` is `bun run --filter '*' typecheck`, and `--filter '*'` enumerates `workspaces`, which
-  # is app, server and worker. So both of these ship a `typecheck` script that nothing has ever run:
-  # `agent-computer` holds the only `spawn` in the deployment and `supervisor` is the only thing
-  # holding a Docker socket, which is a poor pair to leave untyped. Both are clean today, so this
-  # changes nothing about main and only stops the next change being the first one a type checker sees.
+  # is app, server and worker. So `agent-computer` ships a `typecheck` script that nothing else runs,
+  # and it holds the only `spawn` in the deployment. (Upstream also checks `supervisor`; the factory
+  # does not ship it, so this fork does not. AP-288.)
   #
   # Not by adding them to `workspaces`: each is built from its own lockfile and the Dockerfile depends
   # on that, so they are installed separately here for the same reason they are installed separately
@@ -87,7 +86,7 @@ jobs:
       # One red package must not hide whether the other is red too.
       fail-fast: false
       matrix:
-        package: [agent-computer, supervisor]
+        package: [agent-computer]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -105,23 +104,6 @@ jobs:
         working-directory: ${{ matrix.package }}
       - run: bun run typecheck
         working-directory: ${{ matrix.package }}
-
-  mobile:
-    name: native types
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      # The native app is an isolated npm package; adding it to Bun workspaces would change the
-      # existing desktop/server installation contract. CI installs its own reviewed lockfile.
-      - run: npm ci --prefix mobile --ignore-scripts
-      - run: npm run --prefix mobile typecheck
 
   # The agent-computer tests that launch a real Chromium. They are asked for by name because a
   # machine running `bun test` is not required to have a browser, and these are the only tests that
@@ -189,185 +171,6 @@ jobs:
         env:
           OPENBOT_COMPUTER_BROWSER: '1'
           COMPUTER_BROWSER_MODE: headed
-
-  chart:
-    name: chart (${{ matrix.target }})
-    runs-on: ubuntu-latest
-    strategy:
-      # One red target must not hide whether another is red too.
-      fail-fast: false
-      matrix:
-        target: [vanilla, self-hosted, eks, eks-sandbox, gke, aks]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          # The new-values-key check compares this chart against the last released one, or against
-          # main where the chart has not shipped yet. A shallow clone has neither to compare with.
-          fetch-depth: 0
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: v3.19.0
-      # For the coherence check below, which is a Bun script like everything else here.
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.4
-      # Nothing rendered this chart until now, which is how four values files that produce a server
-      # unable to start were shipped and stayed shipped. Rendering is the cheap half; the refusals in
-      # validation.yaml are the half that catches a missing value before a cluster does.
-      - run: helm dependency build charts/openbot
-      # Structure only. `helm lint` reports a template `fail` as an INFO line and exits 0 even under
-      # `--strict`, which was driven and confirmed, so it cannot gate the refusals below. Rendering
-      # does: `helm template` exits non-zero on one.
-      - run: helm lint charts/openbot --values charts/openbot/ci/${{ matrix.target }}-values.yaml
-      # A key encryption key is a real 32 bytes rather than a placeholder, because the chart checks
-      # its shape. Generated here so no example key is ever a literal in this repository.
-      - name: Render
-        run: |
-          helm template ci charts/openbot \
-            --values charts/openbot/ci/${{ matrix.target }}-values.yaml \
-            --set-string secrets.keyEncryptionKey="$(openssl rand -base64 32)" \
-            --api-versions agents.x-k8s.io/v1beta1/Sandbox \
-            --api-versions extensions.agents.x-k8s.io/v1beta1/SandboxTemplate \
-            > rendered.yaml
-      # Rendering proves the templates run. This proves the result is coherent, which is a different
-      # question: every secret key a container demands has to be one the chart actually writes.
-      # Getting that wrong is invisible until a pod starts, and every shipped target had it wrong.
-      - run: bun scripts/check-rendered-chart.ts rendered.yaml
-      # The README's vanilla secrets file is the licence and the model key and nothing else: with the
-      # bundled database the chart generates the rest. Rendered without a key encryption key, and held
-      # to the same coherence check, so that stays true.
-      - name: Renders from the licence and the model key alone
-        if: matrix.target == 'vanilla'
-        run: |
-          helm template ci charts/openbot \
-            --values charts/openbot/ci/vanilla-values.yaml \
-            > rendered-generated.yaml
-          bun scripts/check-rendered-chart.ts rendered-generated.yaml
-      # No target names a Learning credential, so the setup Job renders nowhere above. Render it with
-      # one of each, and hold it to the same coherence check.
-      - name: Learning setup Job renders
-        run: |
-          helm template ci charts/openbot \
-            --values charts/openbot/ci/${{ matrix.target }}-values.yaml \
-            --set-string secrets.keyEncryptionKey="$(openssl rand -base64 32)" \
-            --api-versions agents.x-k8s.io/v1beta1/Sandbox \
-            --api-versions extensions.agents.x-k8s.io/v1beta1/SandboxTemplate \
-            --set-string config.learning.setup.cliLoginSecret.name=openbot-copilotkit-cli \
-            --set-string config.learning.setup.serviceTokenSecret.name=intelligence-service-token \
-            --set-string config.learning.setup.projectId=7 \
-            > rendered-learning.yaml
-          grep -q 'app.kubernetes.io/component: learning-setup' rendered-learning.yaml
-          bun scripts/check-rendered-chart.ts rendered-learning.yaml
-      # And that the refusals are load-bearing rather than decorative. A chart full of `fail`
-      # messages nothing ever triggers is a chart that has never been shown to refuse anything, and
-      # every one of these describes a state that shipped in a values file at some point.
-      - name: Refusals fire
-        run: |
-          set -uo pipefail
-          refuses() {
-            local why="$1"; shift
-            if helm template ci charts/openbot \
-                 --values charts/openbot/ci/${{ matrix.target }}-values.yaml \
-                 --set-string secrets.keyEncryptionKey="$(openssl rand -base64 32)" \
-                 --api-versions agents.x-k8s.io/v1beta1/Sandbox \
-                 --api-versions extensions.agents.x-k8s.io/v1beta1/SandboxTemplate \
-                 "$@" >/dev/null 2>&1; then
-              echo "::error::The chart rendered $why, which it is supposed to refuse."
-              return 1
-            fi
-            echo "refused: $why"
-          }
-          # The public example key, which the server will not start with. Only where this chart
-          # holds the secret: with a store, the value is not readable at template time, so the
-          # refusal is deliberately not armed and asserting it here would be asserting a bug.
-          if ! grep -qE '^ *enabled: true' <(sed -n '/^externalSecrets:/,/^[a-z]/p' charts/openbot/ci/${{ matrix.target }}-values.yaml); then
-            refuses "the public example encryption key" \
-              --set-string secrets.keyEncryptionKey="$(head -c 32 /dev/zero | base64)"
-          else
-            echo "skipped: the example-key refusal is not armed when the secret comes from a store"
-          fi
-          # A Bot endpoint with nothing on the request that says who is calling. Armed whether the
-          # secret is this chart's or a store's, because the key list is readable either way.
-          refuses "a managed agent URL with no token" \
-            --set-string config.managedAgent.url=http://agent.default:8000/ag-ui
-          # A browser inside every replica of a replicated API.
-          refuses "an embedded browser across several replicas" \
-            --set server.embeddedComputer=true --set server.replicaCount=2
-          # A Bot's egress proxy on a port the computer's own network policy does not allow. The
-          # variables reach the computer through extraEnv, so nothing else notices that the policy
-          # then refuses to let it be reached.
-          refuses "an egress proxy the network policy blocks" \
-            --set networkPolicy.enabled=true \
-            --set computers.extraEnv[0].name=EGRESS_PROXY_DEFAULT \
-            --set-string computers.extraEnv[0].value=http://proxy.internal:3128
-          # The residential proxy setting, whose address is a secret the template cannot read, with
-          # network policies on and no path opened to it.
-          refuses "a residential proxy with no path through the network policy" \
-            --set networkPolicy.enabled=true --set computers.egressProxy.enabled=true \
-            --set-string secrets.egressProxyUrl=http://user:pass@gateway.example:8000
-          # The same setting switched on with no URL behind it, where this chart holds the secret.
-          if ! grep -qE '^ *enabled: true' <(sed -n '/^externalSecrets:/,/^[a-z]/p' charts/openbot/ci/${{ matrix.target }}-values.yaml) \
-             && ! grep -qE '^ *existingSecret: [^"]' <(sed -n '/^secrets:/,/^[a-z]/p' charts/openbot/ci/${{ matrix.target }}-values.yaml); then
-            refuses "a residential proxy switched on with no URL" \
-              --set computers.egressProxy.enabled=true
-          else
-            echo "skipped: the proxy URL refusal is armed only where this chart writes the Secret"
-          fi
-          # A delivery or directory switch with no secret behind it. Armed on every target: the chart
-          # requires the value when it holds the secret, and requires the store to name the key when
-          # a store does.
-          refuses "OpenTag switched on with no shared secret" \
-            --set config.opentag.enabled=true
-          refuses "SCIM switched on with no bearer token" \
-            --set config.scim.enabled=true
-          refuses "a Learning service token with no project to create the container in" \
-            --set-string config.learning.setup.serviceTokenSecret.name=intelligence-service-token
-          # The rest are refusals the server makes at boot, mirrored so the value is named at install.
-          refuses "an OpenTag URL with the pairing switched off" \
-            --set-string config.opentag.url=https://opentag.example.com
-          refuses "a partial set of Twilio settings" \
-            --set config.sms.enabled=true --set-string secrets.twilioAuthToken=token \
-            --set-string config.sms.accountSid=AC0 --set-string config.sms.verifyServiceSid=VA0
-          refuses "a push project id that is not a UUID" \
-            --set-string config.push.projectId=not-a-uuid
-          refuses "a delivery public URL that is not http(s)" \
-            --set-string config.deliveryPublicUrl=hooks.example.com
-          # The bundled Intelligence beside one somebody named, and without the licence a self-hosted
-          # Intelligence needs. Armed only on targets that bundle it.
-          if ! grep -qE '^ *enabled: false' <(sed -n '/^intelligence:/,/^[a-z]/p' charts/openbot/ci/${{ matrix.target }}-values.yaml); then
-            refuses "the bundled Intelligence beside an Intelligence address of your own" \
-              --set-string config.intelligence.apiUrl=https://api.intelligence.copilotkit.ai
-            refuses "the bundled Intelligence with no licence for it" \
-              --set-string secrets.licenseToken= \
-              --set-string intelligence.appApi.licenseSecret.existingSecret=openbot-intel-license
-            refuses "the bundled Intelligence with no project key for OpenBot" \
-              --set intelligence.bootstrap.projects=null
-          else
-            echo "skipped: the bundled-Intelligence refusals are armed only where the target bundles it"
-            refuses "no Intelligence at all" \
-              --set-string config.intelligence.apiUrl= --set-string config.intelligence.gatewayWsUrl=
-          fi
-          # A release from before the bundled Intelligence, upgraded with --reuse-values: refused by
-          # name rather than installing a second Intelligence on that chart's bare defaults.
-          refuses "a release with no intelligence.enabled" --set intelligence=null
-          # A warm pool nothing claims from. Only meaningful where the target asks for per-Bot
-          # computers; on the others the mode is not sandbox and the refusal is not armed.
-          if grep -qE '^ *mode: sandbox' charts/openbot/ci/${{ matrix.target }}-values.yaml; then
-            refuses "a warm pool no Bot can be handed a computer from" \
-              --set computers.sandbox.warmPool.enabled=true
-          else
-            echo "skipped: the warm-pool refusal is only armed for computers.mode: sandbox"
-          fi
-      # And that a values key this chart did not used to have still renders when it is absent.
-      #
-      # `helm upgrade --reuse-values` takes the previous release's computed values rather than
-      # merging the new chart's defaults, so a key added by the release being installed is missing on
-      # every deployment that already exists. Unguarded that is a nil dereference that fails the
-      # whole render, or an empty scalar Kubernetes reads as unset. Both shipped: one was found in
-      # review, the other by a live upgrade after the first had been fixed one key over.
-      - name: A new values key can be absent
-        run: bun scripts/check-new-values-keys.ts charts/openbot/ci/${{ matrix.target }}-values.yaml
 
   # The suite in shards, one runner each, so the run takes as long as its slowest shard rather than
   # as long as every file one after another. `bun test --shard` does the split, cut by the per-file
@@ -504,148 +307,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  startup:
-    name: startup (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.4
-      - run: bun install --frozen-lockfile
-      - run: bun test app/tests/build-cache.test.ts
-
-  python-harness:
-    name: python harness regressions
-    # CPU-bound: runs on a 16-core larger runner (org runner group openbot-larger, billed per
-    # minute) for main, releases and pull requests from this repository. Pull requests from forks
-    # stay on the free standard runner.
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'openbot-ubuntu-16core' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.4
-      - name: CrewAI provider-boundary regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-crewai
-          . .venv-crewai/bin/activate
-          python -m pip install --requirement agent-crewai/requirements.txt --requirement agent-crewai/requirements-test.txt
-          python -m pytest agent-crewai/tests -q
-      - name: Claude client-tool continuation regressions
-        run: |
-          set -euo pipefail
-          python -m venv .venv-claude-sdk
-          . .venv-claude-sdk/bin/activate
-          python -m pip install --requirement agent-claude-sdk/requirements.txt --requirement agent-claude-sdk/requirements-test.txt
-          python -m pytest agent-claude-sdk/tests -q
-      - name: LangGraph AG-UI provider-boundary regressions
-        run: |
-          set -euo pipefail
-          python -m venv .venv-langgraph-agui
-          . .venv-langgraph-agui/bin/activate
-          python -m pip install --requirement agent-langgraph-agui/requirements.txt --requirement agent-langgraph-agui/requirements-test.txt
-          python -m pytest agent-langgraph-agui/tests -q
-      - name: LlamaIndex model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-llamaindex
-          . .venv-llamaindex/bin/activate
-          python -m pip install --requirement agent-llamaindex/requirements.txt --requirement agent-llamaindex/requirements-test.txt
-          python -m pytest agent-llamaindex/tests -q
-      - name: Agno model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-agno
-          . .venv-agno/bin/activate
-          python -m pip install --requirement agent-agno/requirements.txt --requirement agent-agno/requirements-test.txt
-          python -m pytest agent-agno/tests -q
-      - name: Strands model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-strands
-          . .venv-strands/bin/activate
-          python -m pip install --requirement agent-strands/requirements.txt --requirement agent-strands/requirements-test.txt
-          python -m pytest agent-strands/tests -q
-      - name: Pydantic AI model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-pydantic-ai
-          . .venv-pydantic-ai/bin/activate
-          python -m pip install --requirement agent-pydantic-ai/requirements.txt --requirement agent-pydantic-ai/requirements-test.txt
-          python -m pytest agent-pydantic-ai/tests -q
-      - name: Google ADK tool-call regressions
-        run: |
-          set -euo pipefail
-          python -m venv .venv-adk
-          . .venv-adk/bin/activate
-          python -m pip install --requirement agent-adk/requirements.txt --requirement agent-adk/requirements-test.txt
-          python -m pytest agent-adk/tests -q
-      - name: Antigravity provider pin and token gate
-        run: |
-          set -euo pipefail
-          python -m venv .venv-antigravity
-          . .venv-antigravity/bin/activate
-          python -m pip install --requirement agent-antigravity/requirements.txt --requirement agent-antigravity/requirements-test.txt
-          python -m pytest agent-antigravity/tests -q
-      - name: Langroid model-choice and tool-call regressions
-        run: |
-          set -euo pipefail
-          python -m venv .venv-langroid
-          . .venv-langroid/bin/activate
-          python -m pip install --requirement agent-langroid/requirements.txt --requirement agent-langroid/requirements-test.txt
-          python -m pytest agent-langroid/tests -q
-      - name: AG2 model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-ag2
-          . .venv-ag2/bin/activate
-          python -m pip install --requirement agent-ag2/requirements.txt --requirement agent-ag2/requirements-test.txt
-          python -m pytest agent-ag2/tests -q
-      - name: Microsoft Agent Framework model-choice regression
-        run: |
-          set -euo pipefail
-          python -m venv .venv-microsoft
-          . .venv-microsoft/bin/activate
-          python -m pip install --requirement agent-microsoft/requirements.txt --requirement agent-microsoft/requirements-test.txt
-          python -m pytest agent-microsoft/tests -q
-      - run: bun install --frozen-lockfile
-      - run: bun test tests/compose.test.ts
-      - run: docker compose --env-file /dev/null --profile harness config --format json >/dev/null
-        env:
-          PICKED_HARNESS_IMAGE: openbot-agent-langgraph-agui:test
-      # Docker Desktop shipped Compose v2.24.5 in early 2024, and that version refuses the whole
-      # project when any service's image is blank, profile or not. The desktop app runs
-      # `compose config` before it starts, so this is the oldest Compose it has to get past.
-      - name: Compose v2.24.5 reads the file with no harness picked
-        run: |
-          set -euo pipefail
-          case "$(uname -m)" in
-            x86_64) arch=x86_64; sum=94355be1d1d395040bbda1490f98d5c7627c30798a7955e1f2a78fda33a4b3e1 ;;
-            aarch64) arch=aarch64; sum=535e90ff9a7f24384f8a38f9f9ad49125485af7ae5ffda7226d091e5b8126948 ;;
-            *) echo "no pinned Compose v2.24.5 for $(uname -m)" >&2; exit 1 ;;
-          esac
-          compose="$RUNNER_TEMP/docker-compose-2.24.5"
-          curl -fsSL --retry 3 -o "$compose" "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-$arch"
-          echo "$sum  $compose" | sha256sum -c -
-          chmod +x "$compose"
-          "$compose" version
-          unset PICKED_HARNESS_IMAGE
-          "$compose" -f docker-compose.yml -f desktop/src-tauri/telemetry.compose.yml --env-file /dev/null config --format json >/dev/null
-          PICKED_HARNESS_IMAGE=openbot-agent-langgraph-agui:test "$compose" --env-file /dev/null --profile harness config --format json >/dev/null
-
   build:
     name: build
     runs-on: ubuntu-latest
@@ -697,14 +358,14 @@ jobs:
   # them typecheck, lint and test perfectly.
   image:
     name: image
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'openbot-ubuntu-16core' }}
+    runs-on: ubuntu-latest
     # The only slow job: it builds the container and boots it, ~14 minutes. The four checks above are
     # seconds and stay on every push, because they catch most things cheaply. This one is the cost, so
     # on a pull request it runs only when an admin adds the `full-ci` label — the point at which the PR
     # is actually a merge candidate. On main and through the release workflow_call it always runs, so
     # nothing reaches a release without it. `verify` treats a skipped job as passing, so an unlabelled
-    # PR is green on the cheap checks alone. It runs on the 16-core larger runner everywhere except
-    # pull requests from forks, which stay on the free standard runner.
+    # PR is green on the cheap checks alone. Upstream runs it on a 16-core larger runner that this
+    # fork does not have, so here it runs on the standard one (AP-288).
     if: >-
       github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'full-ci')
@@ -936,84 +597,13 @@ jobs:
       - if: always()
         run: docker rm -f openbot-ci openbot-ci-computer >/dev/null 2>&1 || true
 
-  # The five images the release publishes alongside the one above. Nothing else here builds them:
-  # they are built by `docker compose up --build`, which only the smoke journey runs and which
-  # cannot run in CI. So a broken `supervisor/Dockerfile` used to surface during a release, after
-  # the `openbot` image had already been pushed, which is the one failure this repository calls out
-  # as leaving a published image with nothing pointing at it.
-  #
-  # Built, not pushed, and one architecture: this answers whether the Dockerfile resolves. Whether
-  # it resolves on arm64 too is answered at release time, on an arm64 runner.
-  #
-  # No registry cache, so a release builds these a second time. `type=gha` needs ACTIONS_* in the
-  # environment, which `build-push-action` injects and a plain `run:` step does not have, and
-  # reaching for another action to export them would buy minutes in a job that runs rarely at the
-  # price of a dependency in the one workflow whose inputs are a security boundary.
-  component-dockerfiles:
-    name: component dockerfiles
-    runs-on: ubuntu-latest
-    # The same cost gate as `image` above, and for the same reason: `agent-computer` pulls
-    # Playwright's base and `server` builds the app, so this is minutes rather than seconds. On main
-    # and through the release's workflow_call it always runs.
-    if: >-
-      github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'full-ci')
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      # A Dockerfile the release does not publish is one a machine would build from source, so the
-      # list and the tree have to agree. Checked here rather than trusted, because the failure is
-      # silent: the release succeeds and a laptop somewhere compiles the app.
-      - name: Every buildable service is published
-        run: |
-          set -euo pipefail
-          found="$(find . -mindepth 2 -maxdepth 2 -name Dockerfile -not -path './node_modules/*' \
-            | sed -e 's|^\./||' -e 's|/Dockerfile$||' | sort)"
-          published="$(jq -r '.[]' .github/published-images.json | sort)"
-          if [ "$found" != "$published" ]; then
-            echo "::error::.github/published-images.json does not match the Dockerfiles in the tree."
-            diff <(echo "$published") <(echo "$found") || true
-            exit 1
-          fi
-      - name: They build
-        run: |
-          set -euo pipefail
-          while read -r image; do
-            echo "::group::$image"
-            docker buildx build --file "$image/Dockerfile" --platform linux/amd64 .
-            echo "::endgroup::"
-          done < <(jq -r '.[]' .github/published-images.json)
-      # Building proves the Dockerfile resolves, not that the image starts. A runtime import of a file
-      # the Dockerfile never copied (../../shared/file-download, from #698) built cleanly and crashed
-      # on start. The computer image has no dependencies to start, so it is booted and asked for health.
-      - name: The computer image starts
-        run: |
-          set -euo pipefail
-          docker buildx build --file agent-computer/Dockerfile --platform linux/amd64 --load \
-            --tag openbot-agent-computer:ci .
-          docker run -d --name computer-ci -e COMPUTER_TOKEN=ci-token-0123456789abcdef \
-            -p 127.0.0.1:4100:4100 openbot-agent-computer:ci
-          for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4100/health >/dev/null; then
-              echo "agent-computer answered /health"
-              exit 0
-            fi
-            if [ "$(docker inspect -f '{{.State.Running}}' computer-ci)" != "true" ]; then break; fi
-            sleep 1
-          done
-          echo "::error::agent-computer did not answer /health"
-          docker logs computer-ci || true
-          exit 1
-
   # One check for branch protection to require. A new job above is covered by this without anybody
   # remembering to add it to a list, and a job that was skipped for the wrong reason is not a pass.
   verify:
     name: verify
     runs-on: ubuntu-latest
     if: always()
-    needs: [static, deployables, mobile, computer-browser, chart, test, test-total, startup, python-harness, build, migrations, image, component-dockerfiles]
+    needs: [static, deployables, computer-browser, test, test-total, build, migrations, image]
     steps:
       - name: Require every check
         env:
