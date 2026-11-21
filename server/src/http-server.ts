@@ -2,6 +2,11 @@ import { DICTATION_HTTP_IDLE_SECONDS } from "@openbot/shared/dictation";
 import { serve } from "bun";
 import { computerAccessCheck } from "./agents/computer-access";
 import type { AgentProfileStore } from "./agents/profile-store";
+import {
+  CROSS_SITE_REFUSAL,
+  singleUserAdmits,
+  singleUserTrustedOrigins,
+} from "./auth/browser-origin";
 import type { OpenBotRole } from "./auth/roles";
 import { websocket as channelSocket } from "./channels/socket";
 import type { ComputerGateway } from "./computer/gateway";
@@ -51,7 +56,7 @@ export function startHttpServer(deps: {
       env: { server: unknown },
     ) => Response | Promise<Response>;
   };
-}): void {
+}) {
   const {
     port,
     config,
@@ -88,7 +93,10 @@ export function startHttpServer(deps: {
   const asChannelSocket = (ws: { data: SocketData }) =>
     ws as unknown as ChannelSocket;
 
-  serve<SocketData>({
+  // Every other /api request is checked by the app; see `createSingleUserOriginGuard`.
+  const trustedOrigins = singleUserTrustedOrigins(config);
+
+  return serve<SocketData>({
     port,
     async fetch(request, server) {
       const url = new URL(request.url);
@@ -102,6 +110,11 @@ export function startHttpServer(deps: {
         streamBotId !== null &&
         request.headers.get("upgrade")?.toLowerCase() === "websocket"
       ) {
+        // Before anything else: with no sign-in the actor below is the admin whoever asks, and this
+        // socket carries the Bot's screen to whichever page opened it.
+        if (config.singleUser && !singleUserAdmits(request, trustedOrigins)) {
+          return new Response(CROSS_SITE_REFUSAL, { status: 403 });
+        }
         if (!config.computer) {
           return new Response("No computer is configured.", { status: 503 });
         }

@@ -35,6 +35,10 @@ import {
   readAuditExportRows,
   recordAuditEvent,
 } from "./audit";
+import {
+  createSingleUserOriginGuard,
+  singleUserTrustedOrigins,
+} from "./auth/browser-origin";
 import { createDevRequireUser } from "./auth/dev-actor";
 import {
   type AppVariables,
@@ -468,6 +472,13 @@ export function createApp(
   },
 ) {
   const app = new Hono<{ Variables: AppVariables }>();
+  // First, ahead of every /api route: with no sign-in, where a request came from is all that tells
+  // the person's own pages from another site's. The computer stream upgrades in http-server.ts.
+  if (config.singleUser)
+    app.use(
+      "/api/*",
+      createSingleUserOriginGuard(singleUserTrustedOrigins(config)),
+    );
   mountDesktopConnectionFailure(app, desktopHostToken);
   mountProviderOAuthProxy(app, modelProviderProxy);
 

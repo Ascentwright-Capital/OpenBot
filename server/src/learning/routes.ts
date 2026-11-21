@@ -7,6 +7,7 @@ import type {
   LearningOverview,
 } from "@openbot/shared/learning";
 import { type AuditStore, recordAuditEvent } from "../audit";
+import { fromTrustedPage } from "../auth/browser-origin";
 import { type AppVariables, requireAdmin } from "../auth/guards";
 import type { LearningAutoAssign } from "./auto-assign";
 import { type LearningSettingsStore, parseLearningSettings } from "./settings";
@@ -90,20 +91,9 @@ export function createLearningRoutes(
     });
   });
   /** JSON excludes form CSRF; browser requests must also match an explicitly trusted origin. */
-  const sameOriginJson = (context: Context<{ Variables: AppVariables }>) => {
-    const origin = context.req.header("origin");
-    const allowed = new Set([
-      new URL(context.req.url).origin,
-      ...trustedOrigins,
-    ]);
-    return (
-      context.req.header("content-type")?.split(";")[0]?.trim() ===
-        "application/json" &&
-      (origin
-        ? allowed.has(origin)
-        : context.req.header("sec-fetch-site") !== "cross-site")
-    );
-  };
+  const sameOriginJson = (context: Context<{ Variables: AppVariables }>) =>
+    context.req.header("content-type")?.split(";")[0]?.trim() ===
+      "application/json" && fromTrustedPage(context.req.raw, trustedOrigins);
   /**
    * Create this project's container with the credential this deployment holds, then assign it.
    * Offered only when there is one (`automatic.canCreate`); without one the page shows what to run.

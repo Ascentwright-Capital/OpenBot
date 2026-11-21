@@ -328,6 +328,12 @@ export type DeploymentConfig = {
    * reaching somewhere other people can get to.
    */
   singleUser: boolean;
+  /**
+   * Where the app is served from, as a browser names it in `Origin`: TRUSTED_ORIGINS, or the app's
+   * local address when that is unset. The same list sign-in trusts, held here too because
+   * single-user mode has no sign-in configuration and still has to know its own pages.
+   */
+  trustedOrigins: string[];
   /** Names OpenBot on the analytics the runtime already sends. Off with OPENBOT_ACCESSIBILITY_DISABLED. */
   accessibility: boolean;
   /**
@@ -899,20 +905,26 @@ function authConfig(
   return {
     baseUrl,
     secret,
-    trustedOrigins: commaSeparated(environment, "TRUSTED_ORIGINS").length
-      ? commaSeparated(environment, "TRUSTED_ORIGINS")
-      : /*
-         * All three spellings of the same place, because this is an allowlist of what a browser
-         * sends and not an address anything dials. `localhost` alone refused a browser pointed at
-         * `127.0.0.1:3010`, which is the address the rest of this deployment hands out.
-         */
-        ["http://127.0.0.1:3010", "http://[::1]:3010", "http://localhost:3010"],
+    trustedOrigins: trustedOriginsOf(environment),
     initialAdminEmails,
     allowedEmailDomains,
     ...(google ? { google } : {}),
     ...(microsoft ? { microsoft } : {}),
     ...(okta ? { okta } : {}),
   };
+}
+
+/** TRUSTED_ORIGINS, or where the app is served locally when it is unset. */
+function trustedOriginsOf(environment: Environment): string[] {
+  const listed = commaSeparated(environment, "TRUSTED_ORIGINS");
+  return listed.length
+    ? listed
+    : /*
+       * All three spellings of the same place, because this is an allowlist of what a browser
+       * sends and not an address anything dials. `localhost` alone refused a browser pointed at
+       * `127.0.0.1:3010`, which is the address the rest of this deployment hands out.
+       */
+      ["http://127.0.0.1:3010", "http://[::1]:3010", "http://localhost:3010"];
 }
 
 /**
@@ -1429,6 +1441,7 @@ export function loadConfig(
     singleUser:
       !organizationAuthUrl &&
       singleUserAllowed(environment, configuredAuthProviders(auth).length > 0),
+    trustedOrigins: trustedOriginsOf(environment),
     accessibility: accessibilityEnabled(environment),
     generativeUi: generativeUiEnabled(environment),
     selfHostBanner: selfHostBannerEnabled(environment),
