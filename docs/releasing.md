@@ -125,7 +125,6 @@ A job added to `ci.yml` is covered by it without anybody updating a list.
 | `tests` | a decision made wrongly, in isolation |
 | `chart` | a Helm values file that renders a server which cannot start, across the self-hosted, EKS, EKS sandbox, GKE and AKS targets |
 | `python harness regressions` | a provider-boundary regression in the Python Bot harnesses |
-| `startup (macos-latest)`, `startup (windows-latest)` | the app's serve-or-build cache deciding wrongly on macOS or Windows |
 | `build` | the app not compiling |
 | `migrations` | a schema change with no migration, or a snapshot that has drifted |
 | `image` | an image that builds but does not boot, or a supervised service that respawns |
