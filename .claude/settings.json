@@ -27,7 +27,8 @@
     ]
   },
   "enabledPlugins": {
-    "pstack@ascentwright": true
+    "pstack@ascentwright": true,
+    "ascentwright@ascentwright": true
   },
   "extraKnownMarketplaces": {
     "ascentwright": {
