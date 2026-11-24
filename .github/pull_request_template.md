@@ -40,4 +40,6 @@ conditional update, `LISTEN`/`NOTIFY` for fan-out.
 
 ## Proof
 
-<!-- What you ran, and what you saw. Screenshots or a recording for anything with a surface. -->
+<!-- What you ran, and what you saw. Anything with a surface: a screenshot of each changed screen and a
+demo video of the changed flow. Nothing to see: "No visible surface:" with why, then the commands and
+their output in a code block. The "PR evidence" check reads this section (agent-harness workflows/verify.md). -->

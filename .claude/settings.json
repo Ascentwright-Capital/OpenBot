@@ -25,5 +25,17 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "pstack@ascentwright": true,
+    "ascentwright@ascentwright": true
+  },
+  "extraKnownMarketplaces": {
+    "ascentwright": {
+      "source": {
+        "source": "directory",
+        "path": "./.agents/shared"
+      }
+    }
   }
 }
