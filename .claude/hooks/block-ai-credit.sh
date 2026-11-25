@@ -1,8 +1,8 @@
 #!/bin/sh
 # Claude Code PreToolUse hook: refuses a commit, pull request, issue or comment that credits an AI.
 # Copy to .claude/hooks/block-ai-credit.sh; templates/claude-settings.json wires it up.
-# The rule is in standards.md: Ken is the sole author. The patterns match the CI check in the .github
-# repository, .github/workflows/ai-credit-check.yml: change both together.
+# The rule is in standards.md: the person you work for is the sole author. The patterns match the
+# CI check in the .github repository, .github/workflows/ai-credit-check.yml: change both together.
 #
 # Blocked: Co-Authored-By an AI tool, "Generated with/by <AI tool>", Claude-Session lines, Claude
 # session and product links, noreply@anthropic.com (also as commit author), and "Requested by" lines.
@@ -26,7 +26,7 @@ requested="$field($inside(\\\\n|\\\\\"|'))?$lead"
 has() { printf '%s' "$payload" | grep -Eqi -e "$1"; }
 
 refuse() {
-  echo "Blocked: $1 credits an AI or names a requester. Ken is the sole author (agent-harness standards.md)." >&2
+  echo "Blocked: $1 credits an AI or names a requester. The person you work for is the sole author (agent-harness standards.md)." >&2
   echo "Remove every Co-Authored-By, Generated with, Claude-Session and Requested by line, and any Claude link, then retry." >&2
   exit 2
 }
