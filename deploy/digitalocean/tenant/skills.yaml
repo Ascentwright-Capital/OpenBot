@@ -318,7 +318,7 @@ skills:
       2. Read the repository's AGENTS.md and README, then KB 11 for owners and standing rules.
       3. Plan in the thread: files, what the person will see, how you will test. Wait for "go" unless it is a text or image fix.
       4. Branch type/ap-number-slug; titles "[Type] Summary (AP-n)"; no AI credit lines.
-      5. Run every check the repository lists; open the pull request with results and the preview link; post the link. Never push to main or merge: Ken reviews and merges.
+      5. Run every check the repository lists; open the pull request with results and the preview link; post the link. Never push to main or merge: a reviewer to be named by Arthur reviews and merges (Kenneth left AscentWright on 25 Nov 2026).
       6. If your GitHub tools only read: put the exact change (file, old text, new text, both languages) in the Linear issue and say a person must apply it.
     tools: []
   - slug: answer-from-the-code
@@ -328,7 +328,7 @@ skills:
       1. Find the answer in the repository (read the files, not just names) and in the Linear specs and Decision log of the company's project.
       2. Answer first in plain words, then "Where": file paths and line ranges, Linear IDs.
       3. If code and spec disagree, show both and say which one runs today.
-      4. If you cannot read it, say what you could not reach and who can (Ken for code and hosting).
+      4. If you cannot read it, say what you could not reach and who can (Fae for code and hosting).
     tools: []
   - slug: nusa-auto-price-lookup
     title: "Look up a Nusa Auto price"
@@ -340,12 +340,12 @@ skills:
     tools: []
   - slug: request-a-coworker
     title: "Request a new or changed coworker"
-    summary: "Write a request for a new or changed bot as a Linear issue for Arthur and Ken."
+    summary: "Write a request for a new or changed bot as a Linear issue for Arthur and Fae."
     instructions: |-
       1. Capture: company and department (CC-DS code from Coworker roles v2), name, what it does and must never do, Slack channel #cc-ds-name, KB documents it reads, skills, tools (Linear, GitHub read/write, browser), hand-offs, human owner.
       2. Check Coworker roles v2: is the seat already defined or "to build"? Reuse its code.
       3. File it in Linear project 00 AscentWright Digital Factory (P-AP-5) with that content and a test: two example requests and the answer you expect.
-      4. Tell the person Arthur (via Claude) builds bot changes and Ken reviews tools and access (D-73).
+      4. Tell the person Arthur (via Claude) builds bot changes and a reviewer to be named by Arthur reviews tools and access (D-73; Kenneth left AscentWright on 25 Nov 2026).
     tools: []
   - slug: answer-with-data
     title: "Answer with data"
@@ -478,7 +478,7 @@ skills:
       KB 15 Part 2, job F. Run when asked and before any launch, deck or campaign.
       1. Look in Linear, the KB documents, marketing drafts and the app catalogue for plan names and prices.
       2. Compare with KB 15 Part 1; retired catalogues are in section 9.
-      3. Report each item: where → what it says → the fix → who fixes it (Ken for the app, 02-40 for marketing copy, Arthur for decks and the master book).
+      3. Report each item: where → what it says → the fix → who fixes it (Fae for the app, 02-40 for marketing copy, Arthur for decks and the master book).
     tools: []
   - slug: nusa-auto-weekly-pack
     title: "Nusa Auto weekly commercial pack"
@@ -497,7 +497,7 @@ skills:
     summary: "Clean a transcript and write the synthesis with decisions, actions and open questions."
     instructions: |-
       Method KB 12.
-      1. Read everything first; load context (KB 01, KB 05, KB 06, the company's Linear project). Known names: Claire = Cilook, WD/Widi = Arthur, Fae = Fausto, Ken = Kenneth, Ito = Kristoforus Adhitya.
+      1. Read everything first; load context (KB 01, KB 05, KB 06, the company's Linear project). Known names: Claire = Cilook, WD/Widi = Arthur, Fae = Fausto, Ken = Kenneth (left AscentWright on 25 Nov 2026; his work moved to Fae), Ito = Kristoforus Adhitya.
       2. Clean: fix misheard words, names and terms; keep speakers, timestamps, doubt and disagreement; check numbers, currencies, dates, negations ("tidak", "belum", "bukan") twice. Unclear and consequential: quote it, give the readings, ask; else [UNCLEAR: ...].
       3. Synthesis by topic: purpose and takeaway; points and reasoning; decisions made (mark "proposed" unless Arthur stated them); open ideas; implications labelled as interpretation; risks; next steps.
       4. Two action lists: "Agreed in the meeting" and "Suggested follow-up (AW Memory)"; owner and date only if said.
