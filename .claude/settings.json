@@ -3,6 +3,12 @@
     "commit": "",
     "pr": ""
   },
+  "permissions": {
+    "allow": [
+      "Bash(npx -y modern-web-guidance@latest:*)",
+      "Bash(pnpx modern-web-guidance@latest:*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -28,7 +34,8 @@
   },
   "enabledPlugins": {
     "pstack@ascentwright": true,
-    "ascentwright@ascentwright": true
+    "ascentwright@ascentwright": true,
+    "modern-web-guidance@ascentwright": true
   },
   "extraKnownMarketplaces": {
     "ascentwright": {
